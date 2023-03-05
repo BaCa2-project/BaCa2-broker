@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "baca2-broker"
+version = "0.1.0"
+description = ""
+authors = ["Bartosz Deptuła <barti.deptula@gmail.com>"]
+readme = "README.md"
+packages = [{include = "baca2_broker"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pyyaml = "^6.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
