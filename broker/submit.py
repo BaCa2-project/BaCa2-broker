@@ -37,8 +37,9 @@ class Submit(Thread):
                  master,
                  submit_id: str,
                  package_path: Path,
-                 submit_path: Path):
-        super().__init__()
+                 submit_path: Path,
+                 *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.state = SubmitState.ADOPTING
 
         self.master = master
@@ -55,12 +56,14 @@ class Submit(Thread):
         self.state = state
         if state == SubmitState.DONE and self.master.delete_records:
             self._conn.exec("DELETE FROM submit_records WHERE id = ?", (self.submit_id,))
+            # TODO: Check if following exits thread.
+            self.master.close_submit()
         else:
             self._conn.exec("UPDATE submit_records SET state=?, error_msg=? WHERE id=?",
                             (state, error_msg, self.submit_id))
 
     @property
-    def _is_built(self):
+    def is_built(self):
         build_dir = self.package_path / ".build"
         return build_dir.exists() and build_dir.is_dir()
 
@@ -81,7 +84,7 @@ class Submit(Thread):
         pass
 
     def process(self):
-        if not self._is_built:
+        if not self.is_built:
             self._change_state(SubmitState.BUILDING)
             self._build_package()
 

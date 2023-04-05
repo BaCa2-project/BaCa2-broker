@@ -1,25 +1,8 @@
 from pathlib import Path
-from queue import PriorityQueue
-from threading import Semaphore
 
 from db.connector import Connection
 from .submit import Submit
 
-class Scheduler:
-    def __init__(self,
-                 threads: int):
-        self.threads = threads
-        self.locked_dirs = set()
-        self.wait_list = PriorityQueue()
-
-    def is_submit_locked(self,
-                         submit: Submit):
-        # if submit.package_path is
-        pass
-
-
-    def schedule_submit(self, submit: Submit):
-        pass
 
 class BrokerMaster:
     def __init__(self,
@@ -32,10 +15,17 @@ class BrokerMaster:
         self.delete_records = delete_records
         self.results_dir = results_dir
         self.threads = threads
-
+        self.submits = {}
 
     def new_submit(self,
                    submit_id: str,
                    package_path: Path,
                    submit_path: Path):
-        pass
+        submit = Submit(self, submit_id, package_path, submit_path)
+        self.submits[submit_id] = submit
+        submit.start()
+
+    def close_submit(self, submit_id: str):
+        if self.submits.get(submit_id) is not None:
+            del self.submits[submit_id]
+
