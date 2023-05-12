@@ -52,6 +52,11 @@ class KolejkaCommunicationServer:
         self.submit_dict: dict[str, Lock] = {}
         self.integrity_lock = Lock()  # for protection against data races
 
+    def __len__(self):
+        with self.integrity_lock:
+            length = len(self.submit_dict)
+        return length
+
     def start_server(self) -> None:
         """Starts the HTTP server in a separate thread"""
         assert not self.is_active
@@ -156,3 +161,6 @@ class _KolejkaCommunicationHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b'S')
+
+    def log_message(self, format: str, *args) -> None:
+        pass
