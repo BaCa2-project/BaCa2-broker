@@ -282,3 +282,6 @@ cython_debug/
 #.idea/
 
 /submit_control.db
+
+# for mac users
+.DS_Store

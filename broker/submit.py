@@ -48,6 +48,7 @@ class Submit(Thread):
         self.submit_path = submit_path
         self.result_path = master.results_dir / submit_id
         self._conn = master.connection
+        self.submit_http_server = master.submit_http_server
 
         self._conn.exec("INSERT INTO submit_records VALUES (?, ?, ?, ?, ?, NULL, ?)",
                         (submit_id, datetime.now(), submit_path, package_path, self.result_path, SubmitState.ADOPTING))
@@ -75,10 +76,10 @@ class Submit(Thread):
         return True
 
     def _send_submit(self):
-        pass
+        self.submit_http_server.add_submit(self.submit_id)
 
-    def _await_results(self):
-        pass
+    def _await_results(self, timeout: float = -1) -> bool:
+        return self.submit_http_server.await_submit(self.submit_id, timeout)
 
     def _call_for_update(self, success: bool, msg: str = None):
         pass
@@ -98,7 +99,8 @@ class Submit(Thread):
         self._send_submit()
 
         self._change_state(SubmitState.AWAITING_JUDGE)
-        self._await_results()
+        # TODO: consider adding timeout for safety (otherwise if something goes wrong the method may never return)
+        self._await_results(timeout=-1)
 
         self._change_state(SubmitState.SAVING)
         self._call_for_update(success=True)
