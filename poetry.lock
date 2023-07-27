@@ -2,13 +2,13 @@
 
 [[package]]
 name = "baca2-package-manager"
-version = "0.2"
+version = "0.2.1"
 description = "A package manager for Baca2 project"
 category = "main"
 optional = false
 python-versions = ">=3.10"
 files = [
-    {file = "baca2-package-manager-0.2.tar.gz", hash = "sha256:d2d0136c6828c56e0090a5600e6b9b78e38d9964663a0aed0df2532153c0de4b"},
+    {file = "baca2-package-manager-0.2.1.tar.gz", hash = "sha256:a367a41ee0bf64549200e4efeac35936b0ed352fee467ad5c32a1ee30f61c91e"},
 ]
 
 [package.dependencies]
@@ -67,4 +67,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "84d8a7608e644dc4bee2e94a9915865eb302228fdeab5780c063981960d5b683"
+content-hash = "30854eec235f46a5523a05c9640f11277d638b81789375490d3b556759420994"
