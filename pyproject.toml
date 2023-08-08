@@ -10,6 +10,7 @@ packages = [{include = "broker"}]
 python = "^3.10"
 pyyaml = "^6.0.1"
 baca2-package-manager = "0.2.2"
+requests = "^2.31.0"
 
 
 [build-system]
