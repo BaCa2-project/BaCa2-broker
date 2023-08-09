@@ -4,7 +4,7 @@ from pathlib import Path
 from baca2PackageManager import Package, TSet
 from yaml import dump
 
-from settings import BUILD_NAMESPACE, KOLEJKA_SRC_DIR
+from settings import BUILD_NAMESPACE, KOLEJKA_SRC_DIR, JUDGES
 
 
 class Builder:
@@ -23,7 +23,6 @@ class Builder:
     def to_yaml(data: dict, path: Path) -> None:
         with open(path, mode='wt', encoding='utf-8') as file:
             dump(data, file)
-
 
     def _generate_test_yaml(self):
         test_yaml = {
@@ -62,7 +61,7 @@ class Builder:
 
     def _create_common(self,
                        test_yaml: dict,
-                       ):
+                       judge_type: str = 'main'):
         self.common_path = self.build_path / 'common'
         self.common_path.mkdir()
 
@@ -70,15 +69,14 @@ class Builder:
 
         os.symlink(KOLEJKA_SRC_DIR / 'kolejka-judge', self.common_path / 'kolejka-judge')
         os.symlink(KOLEJKA_SRC_DIR / 'kolejka-client', self.common_path / 'kolejka-client')
-        # TODO: Add judge.py to common directory
-
-
+        os.symlink(JUDGES[judge_type], self.common_path / 'judge.py')
 
     def build(self):
         self.build_path = self.package.prepare_build(self.build_namespace)
 
         test_yaml = self._generate_test_yaml()
         self._create_common(test_yaml)
+
 
 class SetBuilder:
     def __init__(self, package: Package, t_set: TSet) -> None:

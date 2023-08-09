@@ -1,0 +1,19 @@
+checker: null
+makefile: null
+memory_limit: 10M
+name: set2
+points: 5
+test_generator: null
+tests:
+  test1:
+    memory_limit: 6M
+    name: '1'
+    points: 3
+    time_limit: 9
+  test6:
+    memory_limit: 1M
+    name: '6'
+    points: 0
+    time_limit: 13
+time_limit: 10
+weight: 10
