@@ -2,7 +2,8 @@
 from pathlib import Path
 from baca2PackageManager import set_base_dir, add_supported_extensions
 
-BASE_DIR = Path(__file__).resolve().parent
+
+BASE_DIR = Path(__file__).resolve().parent.absolute()
 BACA2_DIR = BASE_DIR.parent.parent / 'BaCa2'  # Change if you have a different path
 PACKAGES_DIR = BACA2_DIR / 'packages_source'
 KOLEJKA_SRC_DIR = BASE_DIR / 'kolejka_src'
@@ -12,7 +13,8 @@ JUDGES = {
     'main': JUDGES_SRC_DIR / 'judge_main.py'
 }
 
-DB_STRING = f"sqlite://{BASE_DIR.absolute()}/submit_control.db"
+DB_STRING = f"sqlite://{BASE_DIR}/submit_control.db"
+
 
 DELETE_RECORDS = False
 
