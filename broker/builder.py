@@ -1,13 +1,20 @@
 import os
 from pathlib import Path
 
-from baca2PackageManager import Package, TSet
+from baca2PackageManager import Package, TSet, TestF
 from yaml import dump
 
 from settings import BUILD_NAMESPACE, KOLEJKA_SRC_DIR, JUDGES
 
 
 class Builder:
+    TRANSLATE_CMD = {
+        'test_generator': 'generator',
+        'memory_limit': 'memory',
+        'time_limit': 'time',
+    }
+    IGNORED_KEYS = ['name', 'points', 'weight', 'tests']
+
     def __init__(self, package: Package, enable_shortcut: bool = True) -> None:
         self.package = package
         self.build_namespace = BUILD_NAMESPACE
@@ -42,6 +49,8 @@ class Builder:
                     'storage': '5G',
                     'workspace': '5G',
                 }
+                # TODO:
+                # 'url': callback_url,
             }
         }
         if self.enable_shortcut:
@@ -78,26 +87,61 @@ class Builder:
         test_yaml = self._generate_test_yaml()
         self._create_common(test_yaml)
 
+        for t_set in self.package.sets():
+            set_builder = SetBuilder(self.package, t_set, self.build_path)
+            set_builder.build()
 
 
 class SetBuilder:
-    def __init__(self, package: Package, t_set: TSet) -> None:
+    def __init__(self, package: Package, t_set: TSet, build_path: Path) -> None:
         self.package = package
         self.t_set = t_set
         self.name = t_set['name']
-        self.cpp_standard = t_set.get('cpp_standard')
-        self.cpp_arguments = t_set.get('cpp_arguments')
-        self.output_size = t_set.get('output_size')
-        self.source_size = t_set.get('source_memory')
+        self.build_path = build_path / self.name
 
     def _generate_test_yaml(self):
         test_yaml = {
             '!include': '../common/test.yaml',
-            'cpp_standard': self.cpp_standard,
-            'cpp_arguments': self.cpp_arguments,
-            'output_size': self.output_size,
-
         }
+        for k, v in self.t_set:
+            key = Builder.TRANSLATE_CMD.get(k, k)
+            if key == 'time':
+                v = f'{v * 1000}ms'
+            if key not in Builder.IGNORED_KEYS and v is not None:
+                test_yaml[key] = v
+        return test_yaml
+
+    def _add_test(self, test_yaml: dict, test: TestF, include_test: bool = True):
+        single_test = {}
+        if include_test:
+            single_test['!include'] = 'test.yaml'
+
+        if test.get('input') is not None:
+            test_filename = test['name'] + '.in'
+            os.symlink(test['input'], self.build_path / test_filename)
+            single_test['input'] = f'!file {test_filename}'
+        if test.get('output') is not None:
+            test_filename = test['name'] + '.out'
+            os.symlink(test['output'], self.build_path / test_filename)
+            single_test['hint'] = f'!file {test_filename}'
+
+        for k, v in test:
+            key = Builder.TRANSLATE_CMD.get(k, k)
+            if key == 'time':
+                v = f'{v * 1000}ms'
+            if key not in Builder.IGNORED_KEYS[:] + ['input', 'output', 'hint']:
+                single_test[key] = v
+
+        test_yaml[test['name']] = single_test
 
     def build(self):
-        pass
+        os.mkdir(self.build_path)
+
+        test_yaml = self._generate_test_yaml()
+
+        tests_yaml = {}
+        for test in self.t_set.tests():
+            self._add_test(tests_yaml, test)
+
+        Builder.to_yaml(test_yaml, self.build_path / 'test.yaml')
+        Builder.to_yaml(tests_yaml, self.build_path / 'tests.yaml')

@@ -287,3 +287,5 @@ cython_debug/
 .DS_Store
 
 **/.build/
+
+kolejka_src/

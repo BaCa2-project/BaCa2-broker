@@ -1,4 +1,5 @@
 import os
+import shutil
 import stat
 
 import requests as req
@@ -34,7 +35,7 @@ class BrokerMaster:
     @staticmethod
     def refresh_kolejka_src(add_executable_attr: bool = True):
         if KOLEJKA_SRC_DIR.is_dir():
-            KOLEJKA_SRC_DIR.rmdir()
+            shutil.rmtree(KOLEJKA_SRC_DIR)
         KOLEJKA_SRC_DIR.mkdir()
 
         kolejka_judge = req.get('https://kolejka.matinf.uj.edu.pl/kolejka-judge').content
