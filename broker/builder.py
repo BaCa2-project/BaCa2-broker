@@ -5,6 +5,9 @@ from baca2PackageManager import Package, TSet, TestF
 from yaml import dump
 
 from settings import BUILD_NAMESPACE, KOLEJKA_SRC_DIR, JUDGES
+from .yaml_tags import get_dumper, File
+
+INCLUDE_TAG = '0tag::include'
 
 
 class Builder:
@@ -30,7 +33,16 @@ class Builder:
     @staticmethod
     def to_yaml(data: dict, path: Path) -> None:
         with open(path, mode='wt', encoding='utf-8') as file:
-            dump(data, file)
+            file.write(dump(data, Dumper=get_dumper()))
+
+        # replace import tags
+        with open(path, mode='r', encoding='utf-8') as file:
+            content = file.read()
+
+        content = content.replace(INCLUDE_TAG, '!include')
+
+        with open(path, mode='wt', encoding='utf-8') as file:
+            file.write(content)
 
     def _generate_test_yaml(self):
         test_yaml = {
@@ -101,7 +113,7 @@ class SetBuilder:
 
     def _generate_test_yaml(self):
         test_yaml = {
-            '!include': '../common/test.yaml',
+            INCLUDE_TAG: '../common/test.yaml',
         }
         for k, v in self.t_set:
             key = Builder.TRANSLATE_CMD.get(k, k)
@@ -114,16 +126,16 @@ class SetBuilder:
     def _add_test(self, test_yaml: dict, test: TestF, include_test: bool = True):
         single_test = {}
         if include_test:
-            single_test['!include'] = 'test.yaml'
+            single_test[INCLUDE_TAG] = 'test.yaml'
 
         if test.get('input') is not None:
             test_filename = test['name'] + '.in'
             os.symlink(test['input'], self.build_path / test_filename)
-            single_test['input'] = f'!file {test_filename}'
+            single_test['input'] = File(test_filename)
         if test.get('output') is not None:
             test_filename = test['name'] + '.out'
             os.symlink(test['output'], self.build_path / test_filename)
-            single_test['hint'] = f'!file {test_filename}'
+            single_test['hint'] = File(test_filename)
 
         for k, v in test:
             key = Builder.TRANSLATE_CMD.get(k, k)
