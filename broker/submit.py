@@ -1,9 +1,20 @@
+from __future__ import annotations
+
 from threading import Thread
 from pathlib import Path
 from enum import Enum
 from datetime import datetime
 from yaml import safe_load
+
+from baca2PackageManager import Package
 from db.connector import Connection
+from .builder import Builder
+from settings import BUILD_NAMESPACE
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .master import BrokerMaster
 
 
 class SubmitState(Enum):
@@ -32,12 +43,14 @@ class SubmitState(Enum):
     DONE = 200
 
 
-class Submit(Thread):
+class TaskSubmit(Thread):
     def __init__(self,
-                 master,
+                 master: BrokerMaster,
                  submit_id: str,
                  package_path: Path,
+                 commit_id: str,
                  submit_path: Path,
+                 force_rebuild: bool = False,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.state = SubmitState.ADOPTING
@@ -45,47 +58,67 @@ class Submit(Thread):
         self.master = master
         self.submit_id = submit_id
         self.package_path = package_path
+        self.commit_id = commit_id
+        self.package = Package(self.package_path, self.commit_id)
         self.submit_path = submit_path
         self.result_path = master.results_dir / submit_id
-        self._conn = master.connection
-        self.submit_http_server = master.submit_http_server
+        self.force_rebuild = force_rebuild
+        self.sets = []
 
-        self._conn.exec("INSERT INTO submit_records VALUES (?, ?, ?, ?, ?, NULL, ?)",
-                        (submit_id, datetime.now(), submit_path, package_path, self.result_path, SubmitState.ADOPTING))
+        self._conn = master.connection
+        self._conn.exec("INSERT INTO submit_records VALUES (?, ?, ?, ?, ?, ?, NULL, ?)",
+                        (self.submit_id,  # id
+                         datetime.now(),  # launch_datetime
+                         self.submit_path,  # submit_path
+                         self.package_path,  # package_path
+                         self.commit_id,  # commit_id
+                         self.result_path,  # result_path
+                         self.state  # state
+                         ))
 
     def _change_state(self, state: SubmitState, error_msg: str = None):
         self.state = state
-        if state == SubmitState.DONE and self.master.delete_records:
-            self._conn.exec("DELETE FROM submit_records WHERE id = ?", (self.submit_id,))
+        if state == SubmitState.DONE:
+            if self.master.delete_records:
+                self._conn.exec("DELETE FROM submit_records WHERE id = ?", (self.submit_id,))
             # TODO: Check if following exits thread.
             self.master.close_submit()
         else:
             self._conn.exec("UPDATE submit_records SET state=?, error_msg=? WHERE id=?",
                             (state, error_msg, self.submit_id))
 
-    @property
-    def is_built(self):
-        build_dir = self.package_path / ".build"
-        return build_dir.exists() and build_dir.is_dir()
+    def close_set_submit(self, set_name: str):
+        pass
+
+    def _call_for_update(self, success: bool, msg: str = None):
+        pass
+
+    def _fill_sets(self):
+        sets = self.package.sets()
+        for t_set in sets:
+            self.sets.append(SetSubmit(self.master,
+                                       self,
+                                       self.submit_id,
+                                       self.package,
+                                       t_set['name'],
+                                       self.submit_path))
 
     def _build_package(self):
-        pass
+        if self.force_rebuild:
+            self.master.refresh_kolejka_src()
+
+        build_pkg = Builder(self.package)
+        build_pkg.build()
 
     def _check_build(self):
         # TODO: Consult package checking
         return True
 
-    def _send_submit(self):
-        self.submit_http_server.add_submit(self.submit_id)
-
-    def _await_results(self, timeout: float = -1) -> bool:
-        return self.submit_http_server.await_submit(self.submit_id, timeout)
-
-    def _call_for_update(self, success: bool, msg: str = None):
-        pass
-
     def process(self):
-        if not self.is_built:
+        self._change_state(SubmitState.AWAITING_PREPROC)
+        self._fill_sets()
+
+        if (not self.package.check_build(BUILD_NAMESPACE)) or self.force_rebuild:
             self._change_state(SubmitState.BUILDING)
             self._build_package()
 
@@ -95,6 +128,58 @@ class Submit(Thread):
             self._call_for_update(success=False, msg='Package check error')
             return
 
+        self._change_state(SubmitState.SENDING)
+        for s in self.sets:
+            s.start()
+
+
+class SetSubmit(Thread):
+    def __init__(self,
+                 master: BrokerMaster,
+                 task_submit: TaskSubmit,
+                 submit_id: str,
+                 package: Package,
+                 set_name: str,
+                 submit_path: Path,
+                 *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.state = SubmitState.ADOPTING
+
+        self.master = master
+        self.task_submit = task_submit
+        self.submit_id = submit_id
+        self.package = package
+        self.set_name = set_name
+        self.set_submit_url = f'{self.submit_id}_{self.set_name}'
+
+        self.submit_path = submit_path
+        self.result_path = master.results_dir / submit_id / set_name
+        self._conn = master.connection
+        self.submit_http_server = master.submit_http_server
+
+        self._conn.exec("INSERT INTO set_submit_records VALUES (NULL, ?, ?, NULL, ?)",
+                        (self.submit_id, self.set_name, self.state))
+
+    def _change_state(self, state: SubmitState, error_msg: str = None):
+        # TODO: Add state monitoring for parent (task) submit
+        self.state = state
+        if state == SubmitState.DONE:
+            if self.master.delete_records:
+                self._conn.exec("DELETE FROM set_submit_records WHERE submit_id=? AND set_name=?",
+                                (self.submit_id, self.set_name))
+            # TODO: Check if following exits thread.
+            self.task_submit.close_set_submit(self.set_name)
+        else:
+            self._conn.exec("UPDATE set_submit_records SET state=?, error_msg=? WHERE submit_id=? AND set_name=?",
+                            (state, error_msg, self.submit_id, self.set_name))
+
+    def _send_submit(self):
+        self.submit_http_server.add_submit(self.set_submit_url)
+
+    def _await_results(self, timeout: float = -1) -> bool:
+        return self.submit_http_server.await_submit(self.set_submit_url, timeout)
+
+    def process(self):
         self._change_state(SubmitState.SENDING)
         self._send_submit()
 
