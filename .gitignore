@@ -286,4 +286,4 @@ cython_debug/
 # for mac users
 .DS_Store
 
-*/.build/
+**/.build/

@@ -14,6 +14,7 @@ class Builder:
         self.build_path = None
         self.enable_shortcut = enable_shortcut
         self.common_path = None
+        self.source_size = package.get('source_size')
 
     @property
     def is_built(self) -> bool:
@@ -78,10 +79,25 @@ class Builder:
         self._create_common(test_yaml)
 
 
+
 class SetBuilder:
     def __init__(self, package: Package, t_set: TSet) -> None:
         self.package = package
         self.t_set = t_set
+        self.name = t_set['name']
+        self.cpp_standard = t_set.get('cpp_standard')
+        self.cpp_arguments = t_set.get('cpp_arguments')
+        self.output_size = t_set.get('output_size')
+        self.source_size = t_set.get('source_memory')
+
+    def _generate_test_yaml(self):
+        test_yaml = {
+            '!include': '../common/test.yaml',
+            'cpp_standard': self.cpp_standard,
+            'cpp_arguments': self.cpp_arguments,
+            'output_size': self.output_size,
+
+        }
 
     def build(self):
         pass
