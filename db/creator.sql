@@ -18,7 +18,6 @@ create table baca_requests(
     submit_id integer not null,
     submit_path varchar(2048) not null,
     package_path varchar(2048) not null,
-    result_path varchar(2048) not null,
     mod_time datetime not null,
     state int not null
 );

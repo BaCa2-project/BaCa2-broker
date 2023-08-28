@@ -3,30 +3,38 @@ import datetime as dt
 from pathlib import Path
 from threading import Thread
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
-import http.client as client
 from sqlite3 import connect
 from enum import Enum, auto
 
+import requests
+
 from broker.master import BrokerMaster
+from checker_parsers import parse_from_kolejka
 
 
 class RequestStatus(Enum):
-    ERROR = auto()
     RECEIVED = auto()
     PENDING = auto()
     CHECKED = auto()
-    DONE = auto()
+    SENDING_ERROR = auto()
+    # DONE = auto()
 
 
 class BacaApiReceiver:
 
-    def __init__(self, master: BrokerMaster, database: Path, ip: str = '127.0.0.1', port: int = 8081):
-        self.ip: str = ip
-        self.port: int = port
+    def __init__(self,
+                 master: BrokerMaster,
+                 database: Path,
+                 server_ip: str = '127.0.0.1',
+                 server_port: int = 8081,
+                 baca_api_url: str = 'http://127.0.0.1/broker_api/'):
+        self.server_ip: str = server_ip
+        self.server_port: int = server_port
+        self.baca_url: str = baca_api_url
         self.master: BrokerMaster = master
         self.database: Path = database
         self.con = connect(str(self.database.absolute()))
-        self.server = ThreadingHTTPServer2(self, (self.ip, self.port), BacaApiHandler)
+        self.server = ThreadingHTTPServer2(self, (self.server_ip, self.server_port), BacaApiHandler)
         self.thread = Thread(target=self.server.serve_forever)
 
     @property
@@ -51,8 +59,7 @@ class BacaApiReceiver:
                course: str,
                submit_id: int,
                package_path: str,
-               solution_path: str,
-               output_path: str) -> str:
+               solution_path: str) -> str:
         """
         :return: request_id, which is used as `id` in both `submit_records` and `baca_requests` tables
         """
@@ -60,12 +67,12 @@ class BacaApiReceiver:
         cur = self.con.execute(
             '''
             INSERT INTO
-                baca_requests(id, course, submit_id, submit_path, package_path, result_path, mod_time, state)
+                baca_requests(id, course, submit_id, submit_path, package_path, mod_time, state)
             VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?)
+                (?, ?, ?, ?, ?, ?, ?)
             ''',
             (request_id, course, submit_id, solution_path, package_path,
-             output_path, dt.datetime.now(), RequestStatus.RECEIVED)
+             dt.datetime.now(), RequestStatus.RECEIVED)
         )
         if cur.rowcount != 1:
             self.con.rollback()
@@ -73,7 +80,7 @@ class BacaApiReceiver:
         self.con.commit()
         return request_id
 
-    def check(self, request_id: str):
+    def check(self, request_id: str) -> None:
         cur = self.con.execute('SELECT package_path, submit_path FROM baca_requests WHERE id = ?',
                                (request_id,))
         package_path, submit_path = cur.fetchone()
@@ -89,8 +96,27 @@ class BacaApiReceiver:
             raise Exception(e)  # TODO
         self.con.commit()
 
-    def send(self, request_id: str):  # TODO
-        ...
+    def send(self, request_id: str, result_path: Path) -> None:
+        cur = self.con.execute('SELECT course, submit_id, state FROM baca_requests WHERE id = ?',
+                               (request_id,))
+        tmp = cur.fetchone()
+        if tmp is None:
+            raise Exception  # TODO
+
+        course, submit_id, state = tmp
+        if state not in [RequestStatus.CHECKED, RequestStatus.SENDING_ERROR]:
+            raise Exception  # TODO
+
+        message = parse_from_kolejka(result_path)
+        r = requests.post(url=self.baca_url, json=dict(message))
+        if r.status_code != 200:
+            self.con.execute('UPDATE baca_requests SET state = ?, mod_time = ? WHERE id = ?',
+                             (RequestStatus.SENDING_ERROR, dt.datetime.now(), request_id))
+            self.con.commit()
+            raise Exception  # TODO
+
+        cur = self.con.execute('DELETE FROM baca_requests WHERE id = ?', (request_id,))
+        assert cur.lastrowid == 1
 
 
 class ThreadingHTTPServer2(ThreadingHTTPServer):
