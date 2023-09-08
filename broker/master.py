@@ -8,7 +8,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from threading import Thread, Lock
 
 from db.connector import Connection
-from .submit import Submit
+from .submit import TaskSubmit
 
 from settings import KOLEJKA_SRC_DIR
 
@@ -16,14 +16,14 @@ from settings import KOLEJKA_SRC_DIR
 class BrokerMaster:
     def __init__(self,
                  db_string: str,
-                 results_dir: Path,
+                 submits_dir: Path,
                  delete_records: bool = True,
                  threads: int = 2,
-                 server_address: tuple[str, int] = ('127.0.0.1', 8080)
+                 server_address: tuple[str, int] = ('127.0.0.1', 15212)
                  ):
         self.connection = Connection(db_string)
         self.delete_records = delete_records
-        self.results_dir = results_dir
+        self.submits_dir = submits_dir
         self.threads = threads
         self.submits = {}
         self.submit_http_server = KolejkaCommunicationServer(*server_address)
@@ -60,7 +60,7 @@ class BrokerMaster:
                    submit_id: str,
                    package_path: Path,
                    submit_path: Path):
-        submit = Submit(self, submit_id, package_path, submit_path)
+        submit = TaskSubmit(self, submit_id, package_path, submit_path)
         self.submits[submit_id] = submit
         submit.start()
 
