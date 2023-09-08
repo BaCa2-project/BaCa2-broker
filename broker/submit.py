@@ -237,21 +237,22 @@ class SetSubmit(Thread):
     def _send_submit(self):
         self.submit_http_server.add_submit(self.set_submit_url)
         if sys.platform.startswith('win'):
-            python_call = 'python.exe'
+            python_call = 'py'
         else:
             python_call = 'python3'
 
         task_dir = self.task_submit.task_submit_dir / f'{self.set_name}.task'
         result_dir = self.task_submit.task_submit_dir / f'{self.set_name}.result'
-        cmd_judge = f'{python_call} \"{self.task_submit.kolejka_judge}\" task --callback \"{self.set_submit_url}\" ' \
+        # cmd_judge = f'{python_call} \"{self.task_submit.kolejka_judge}\" task --callback \"{self.set_submit_url}\" ' \
+        cmd_judge = f'{python_call} \"{self.task_submit.kolejka_judge}\" task ' \
                     f'\"{self.task_submit.judge_py}\" ' \
                     f'\"{self.package.build_path(BUILD_NAMESPACE) / self.set_name / "tests.yaml"}\" ' \
                     f'\"{self.submit_path}\" \"{task_dir}\"'
         cmd_client = f'{python_call} \"{self.task_submit.kolejka_client}\" --config-file \"{KOLEJKA_CONF}\" execute ' \
                      f'\"{task_dir}\" \"{result_dir}\"'
 
-        os.system(shlex_quote(cmd_judge))
-        os.system(shlex_quote(cmd_client))
+        os.system(cmd_judge)
+        os.system(cmd_client)
 
     def _await_results(self, timeout: float = -1) -> bool:
         return self.submit_http_server.await_submit(self.set_submit_url, timeout)
