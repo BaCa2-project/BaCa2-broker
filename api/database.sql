@@ -1,4 +1,4 @@
-drop table if exists baca_requests;
+--drop table if exists baca_requests;
 
 create table baca_requests(
     id text primary key,

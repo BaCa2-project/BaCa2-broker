@@ -11,10 +11,15 @@ class BacaToBroker:
 
 
 @dataclass
-class BrokerToBaca:
-    course_name: str
-    submit_id: int
+class Test:
     status: str
     time_real: float
     time_cpu: float
     runtime_memory: int
+
+
+@dataclass
+class BrokerToBaca:
+    course_name: str
+    submit_id: int
+    tests: list[Test]

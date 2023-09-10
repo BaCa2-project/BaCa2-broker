@@ -26,7 +26,7 @@ class BacaApiServer(BacaApiServerAbstract):
     def __init__(self,
                  manager: BacaApiManager,
                  server_ip: str = '127.0.0.1',
-                 server_port: int = 8081
+                 server_port: int = 8180
                  ):
         self.manager = manager
         self.server_ip: str = server_ip
@@ -85,4 +85,4 @@ class BacaApiHandler(BaseHTTPRequestHandler):
 
         self.send_response(200)
         self.end_headers()
-        self.server.manager.manager.receive(**dict(content))
+        self.server.manager.manager.insert(content)
