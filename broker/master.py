@@ -104,7 +104,8 @@ class KolejkaCommunicationServer:
         """Returns True if the HTTP server is currently operational"""
         return self.server_thread.is_alive()
 
-    def add_submit(self, submit_id: str) -> None:
+    def add_submit(self, submit_id: str) -> str:
+        # TODO: adding submit should return url for submit
         """
         Adds a submit record to the local storage. Marks it as 'awaiting checking' for KOLEJKA system.
 
@@ -115,6 +116,7 @@ class KolejkaCommunicationServer:
                 raise ValueError('Submit with id %s already registered.' % submit_id)
             self.submit_dict[submit_id] = Lock()
             self.submit_dict[submit_id].acquire()
+        return f'http://{self.host}:{self.port}/{submit_id}'
 
     def release_submit(self, submit_id: str) -> None:
         """

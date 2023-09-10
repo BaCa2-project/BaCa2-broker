@@ -39,7 +39,7 @@ class Builder:
         with open(path, mode='r', encoding='utf-8') as file:
             content = file.read()
 
-        content = content.replace(INCLUDE_TAG, '!include')
+        content = content.replace(INCLUDE_TAG, '!include ')
 
         with open(path, mode='wt', encoding='utf-8') as file:
             file.write(content)

@@ -2,23 +2,34 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 import sys
 from threading import Thread, Lock
 from pathlib import Path
 from enum import Enum
 from datetime import datetime
+from time import sleep
+
 from yaml import safe_load
 
 from baca2PackageManager import Package
 from db.connector import Connection
 from .builder import Builder
-from settings import BUILD_NAMESPACE, SUBMITS_DIR, KOLEJKA_CONF
+from settings import BUILD_NAMESPACE, KOLEJKA_CONF
 
 from typing import TYPE_CHECKING
 from shlex import quote as shlex_quote
 
 if TYPE_CHECKING:
     from .master import BrokerMaster
+
+
+def _translate_paths(*args):
+    for arg in args:
+        if isinstance(arg, Path):
+            yield str(arg)
+        else:
+            yield arg
 
 
 class SubmitState(Enum):
@@ -48,6 +59,8 @@ class SubmitState(Enum):
 
 
 class TaskSubmit(Thread):
+    TIMEOUT_STEP = 3
+
     def __init__(self,
                  master: BrokerMaster,
                  submit_id: str,
@@ -185,6 +198,9 @@ class TaskSubmit(Thread):
 
 
 class SetSubmit(Thread):
+    class KOLEJKACommunicationFailed(Exception):
+        pass
+
     def __init__(self,
                  master: BrokerMaster,
                  task_submit: TaskSubmit,
@@ -201,7 +217,7 @@ class SetSubmit(Thread):
         self.submit_id = submit_id
         self.package = package
         self.set_name = set_name
-        self.set_submit_url = f'{self.submit_id}_{self.set_name}'
+        self.callback_url = None
 
         self.submit_path = submit_path
         self._conn = master.connection
@@ -209,6 +225,13 @@ class SetSubmit(Thread):
 
         self._conn.exec("INSERT INTO set_submit_records VALUES (NULL, ?, ?, NULL, ?)",
                         self.submit_id, self.set_name, self.state)
+        self.task_dir = self.task_submit.task_submit_dir / f'{self.set_name}.task'
+        self.result_dir = self.task_submit.task_submit_dir / f'{self.set_name}.result'
+
+        if sys.platform.startswith('win'):
+            self.python_call = 'py'
+        else:
+            self.python_call = 'python3'
 
         # self._call_for_update()
 
@@ -235,27 +258,65 @@ class SetSubmit(Thread):
         self._call_for_update()
 
     def _send_submit(self):
-        self.submit_http_server.add_submit(self.set_submit_url)
-        if sys.platform.startswith('win'):
-            python_call = 'py'
+        self.callback_url = self.submit_http_server.add_submit(f'{self.submit_id}_{self.set_name}')
+        # TODO: adding submit should return url
+
+        cmd_judge = [self.python_call, self.task_submit.kolejka_judge,
+                     'task',
+                     '--callback', self.callback_url,
+                     '--library-path', self.task_submit.kolejka_judge,
+                     self.task_submit.judge_py,
+                     self.package.build_path(BUILD_NAMESPACE) / self.set_name / "tests.yaml",
+                     self.submit_path,
+                     self.task_dir]
+        cmd_client = [self.python_call, self.task_submit.kolejka_client,
+                      '--config-file', KOLEJKA_CONF,
+                      'task', 'put',
+                      self.task_dir]
+
+        # kolejka-client result get <result_dir>
+
+        cmd_judge = list(_translate_paths(*cmd_judge))
+        cmd_client = list(_translate_paths(*cmd_client))
+
+        judge_status = subprocess.run(cmd_judge)
+        if judge_status.returncode != 0:
+            raise self.KOLEJKACommunicationFailed('KOLEJKA judge failed to create task.')
+
+        client_status = subprocess.run(cmd_client, capture_output=True)
+        self.result_code = client_status.stdout.decode('utf-8').strip()
+
+        if client_status.returncode != 0:
+            raise self.KOLEJKACommunicationFailed('KOLEJKA client failed to communicate with KOLEJKA server.')
+
+    def _await_results(self, timeout: float = -1, active_wait:bool = False) -> bool:
+        if not active_wait:
+            self.submit_http_server.await_submit(self.set_submit_url, timeout)
+
+        result_get = [self.python_call,
+                      self.task_submit.kolejka_client,
+                        '--config-file', KOLEJKA_CONF,
+                      'result', 'get',
+                      self.result_code,
+                      self.result_dir]
+
+        result_get = list(_translate_paths(*result_get))
+
+        result_status = subprocess.run(result_get, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        if not active_wait:
+            if result_status.returncode != 0:
+                raise self.KOLEJKACommunicationFailed('KOLEJKA client failed to communicate with KOLEJKA server.')
         else:
-            python_call = 'python3'
+            time_track = 0
+            while result_status.returncode != 0:
+                sleep(self.task_submit.TIMEOUT_STEP)
+                time_track += self.task_submit.TIMEOUT_STEP
+                result_status = subprocess.run(result_get, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if 0 < timeout < time_track:
+                    raise self.KOLEJKACommunicationFailed('Reached timeout while waiting for KOLEJKA response.')
 
-        task_dir = self.task_submit.task_submit_dir / f'{self.set_name}.task'
-        result_dir = self.task_submit.task_submit_dir / f'{self.set_name}.result'
-        # cmd_judge = f'{python_call} \"{self.task_submit.kolejka_judge}\" task --callback \"{self.set_submit_url}\" ' \
-        cmd_judge = f'{python_call} \"{self.task_submit.kolejka_judge}\" task ' \
-                    f'\"{self.task_submit.judge_py}\" ' \
-                    f'\"{self.package.build_path(BUILD_NAMESPACE) / self.set_name / "tests.yaml"}\" ' \
-                    f'\"{self.submit_path}\" \"{task_dir}\"'
-        cmd_client = f'{python_call} \"{self.task_submit.kolejka_client}\" --config-file \"{KOLEJKA_CONF}\" execute ' \
-                     f'\"{task_dir}\" \"{result_dir}\"'
-
-        os.system(cmd_judge)
-        os.system(cmd_client)
-
-    def _await_results(self, timeout: float = -1) -> bool:
-        return self.submit_http_server.await_submit(self.set_submit_url, timeout)
+        return True
 
     def process(self):
         self._change_state(SubmitState.SENDING)
@@ -263,7 +324,7 @@ class SetSubmit(Thread):
 
         self._change_state(SubmitState.AWAITING_JUDGE)
         # TODO: consider adding timeout for safety (otherwise if something goes wrong the method may never return)
-        self._await_results(timeout=-1)
+        self._await_results(timeout=30, active_wait=True)
 
         self._change_state(SubmitState.SAVING)
 
