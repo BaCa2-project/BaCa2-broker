@@ -6,7 +6,7 @@ import cgi
 import json
 
 from .manager import BacaApiManager
-from message import BacaToBroker
+from .message import BacaToBroker
 
 
 class BacaApiServerAbstract(ABC):
@@ -86,3 +86,4 @@ class BacaApiHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
         self.server.manager.manager.insert(content)
+        # TODO: Start checking process here
