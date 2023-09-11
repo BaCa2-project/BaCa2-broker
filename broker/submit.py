@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 import sys
@@ -114,8 +113,7 @@ class TaskSubmit(Thread):
 
     def _change_state(self, state: SubmitState, error_msg: str = None):
         self.state = state
-        if state == SubmitState.DONE:
-            if self.master.delete_records:
+        if state == SubmitState.DONE and self.master.delete_records:
                 self._conn.exec("DELETE FROM submit_records WHERE id = ?", self.submit_id, )
             # TODO: Check if following exits thread.
             # self.master.close_submit()
@@ -244,11 +242,11 @@ class SetSubmit(Thread):
     def _change_state(self, state: SubmitState, error_msg: str = None):
         # TODO: Add state monitoring for parent (task) submit
         self.state = state
-        if state == SubmitState.DONE:
-            if self.master.delete_records:
-                self._conn.exec("DELETE FROM set_submit_records WHERE submit_id=? AND set_name=?",
-                                self.submit_id, self.set_name)
+        if state == SubmitState.DONE and self.master.delete_records:
+            self._conn.exec("DELETE FROM set_submit_records WHERE submit_id=? AND set_name=?",
+                            self.submit_id, self.set_name)
             # TODO: Check if following exits thread.
+        elif state == SubmitState.DONE or state == SubmitState.ERROR:
             self.task_submit.close_set_submit(self.set_name)
         else:
             self._conn.exec("UPDATE set_submit_records SET state=?, error_msg=? WHERE submit_id=? AND set_name=?",
@@ -324,7 +322,7 @@ class SetSubmit(Thread):
 
         self._change_state(SubmitState.AWAITING_JUDGE)
         # TODO: consider adding timeout for safety (otherwise if something goes wrong the method may never return)
-        self._await_results(timeout=30, active_wait=True)
+        self._await_results(timeout=60, active_wait=True)
 
         self._change_state(SubmitState.SAVING)
 

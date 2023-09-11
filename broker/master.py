@@ -10,14 +10,14 @@ from threading import Thread, Lock
 from db.connector import Connection
 from .submit import TaskSubmit
 
-from settings import KOLEJKA_SRC_DIR
+from settings import KOLEJKA_SRC_DIR, APP_SETTINGS
 
 
 class BrokerMaster:
     def __init__(self,
                  db_string: str,
                  submits_dir: Path,
-                 delete_records: bool = True,
+                 delete_records: bool = APP_SETTINGS['delete_records'],
                  threads: int = 2,
                  server_address: tuple[str, int] = ('127.0.0.1', 15212)
                  ):
@@ -59,8 +59,15 @@ class BrokerMaster:
     def new_submit(self,
                    submit_id: str,
                    package_path: Path,
+                   commit_id: str,
                    submit_path: Path):
-        submit = TaskSubmit(self, submit_id, package_path, submit_path)
+        submit = TaskSubmit(self,
+                            submit_id,
+                            package_path,
+                            commit_id,
+                            submit_path,
+                            force_rebuild=APP_SETTINGS['force_rebuild'],
+                            verbose=APP_SETTINGS['verbose'])
         self.submits[submit_id] = submit
         submit.start()
 

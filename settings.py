@@ -2,6 +2,21 @@
 from pathlib import Path
 from baca2PackageManager import set_base_dir, add_supported_extensions
 
+MODES = {
+    'production': {
+        'delete_records': False,
+        'verbose': False,
+        'force_rebuild': False,
+    },
+    'development': {
+        'delete_records': True,
+        'verbose': True,
+        'force_rebuild': True,
+    }
+}
+APP_MODE = 'development'
+APP_SETTINGS = MODES[APP_MODE]
+
 BASE_DIR = Path(__file__).resolve().parent
 BACA2_DIR = BASE_DIR.parent.parent / 'BaCa2'  # Change if you have a different path
 PACKAGES_DIR = BACA2_DIR / 'packages_source'
