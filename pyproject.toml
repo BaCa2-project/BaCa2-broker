@@ -8,6 +8,9 @@ packages = [{include = "broker"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
+pyyaml = "^6.0"
+requests = "^2.0"
+baca2-package-manager = "^0.2"
 pyyaml = "^6.0.1"
 baca2-package-manager = "0.2.7"
 requests = "^2.31.0"

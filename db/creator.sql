@@ -18,4 +18,4 @@ create table set_submit_records(
     set_name text not null,
     error_msg text null,
     state int not null
-)
+);
