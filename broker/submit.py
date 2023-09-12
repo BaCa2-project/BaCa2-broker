@@ -9,17 +9,13 @@ from enum import Enum
 from datetime import datetime
 from time import sleep
 
-from yaml import safe_load
-
 from baca2PackageManager import Package
-from db.connector import Connection
+from baca2PackageManager.broker_communication import SetResult
 from .builder import Builder
 from settings import BUILD_NAMESPACE, KOLEJKA_CONF
 
 from typing import TYPE_CHECKING
-from shlex import quote as shlex_quote
 
-from .message import SetResult
 
 if TYPE_CHECKING:
     from .master import BrokerMaster
