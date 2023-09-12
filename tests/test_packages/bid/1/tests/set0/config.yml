@@ -1,0 +1,9 @@
+checker: null
+makefile: null
+memory_limit: 512M
+name: set0
+points: 0
+test_generator: null
+tests: {}
+time_limit: 10
+weight: 10

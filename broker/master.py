@@ -1,22 +1,29 @@
+import os
+import shutil
+import stat
+
+import requests as req
 from pathlib import Path
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from threading import Thread, Lock
 
 from db.connector import Connection
-from .submit import Submit
+from .submit import TaskSubmit
+
+from settings import KOLEJKA_SRC_DIR, APP_SETTINGS
 
 
 class BrokerMaster:
     def __init__(self,
                  db_string: str,
-                 results_dir: Path,
-                 delete_records: bool = True,
+                 submits_dir: Path,
+                 delete_records: bool = APP_SETTINGS['delete_records'],
                  threads: int = 2,
-                 server_address: tuple[str, int] = ('127.0.0.1', 8080)
+                 server_address: tuple[str, int] = ('127.0.0.1', 15212)
                  ):
         self.connection = Connection(db_string)
         self.delete_records = delete_records
-        self.results_dir = results_dir
+        self.submits_dir = submits_dir
         self.threads = threads
         self.submits = {}
         self.submit_http_server = KolejkaCommunicationServer(*server_address)
@@ -25,11 +32,42 @@ class BrokerMaster:
     def __del__(self):
         self.submit_http_server.stop_server()
 
+    @staticmethod
+    def refresh_kolejka_src(add_executable_attr: bool = True):
+        if KOLEJKA_SRC_DIR.is_dir():
+            shutil.rmtree(KOLEJKA_SRC_DIR)
+        KOLEJKA_SRC_DIR.mkdir()
+
+        kolejka_judge = req.get('https://kolejka.matinf.uj.edu.pl/kolejka-judge').content
+        kolejka_client = req.get('https://kolejka.matinf.uj.edu.pl/kolejka-client').content
+
+        kolejka_judge_path = KOLEJKA_SRC_DIR / 'kolejka-judge'
+        kolejka_client_path = KOLEJKA_SRC_DIR / 'kolejka-client'
+
+        with open(kolejka_judge_path, mode='wb') as judge:
+            judge.write(kolejka_judge)
+        with open(kolejka_client_path, mode='wb') as client:
+            client.write(kolejka_client)
+
+        if add_executable_attr:
+            current_judge = os.stat(kolejka_judge_path)
+            current_client = os.stat(kolejka_client_path)
+
+            os.chmod(kolejka_judge_path, current_judge.st_mode | stat.S_IEXEC)
+            os.chmod(kolejka_client_path, current_client.st_mode | stat.S_IEXEC)
+
     def new_submit(self,
                    submit_id: str,
                    package_path: Path,
+                   commit_id: str,
                    submit_path: Path):
-        submit = Submit(self, submit_id, package_path, submit_path)
+        submit = TaskSubmit(self,
+                            submit_id,
+                            package_path,
+                            commit_id,
+                            submit_path,
+                            force_rebuild=APP_SETTINGS['force_rebuild'],
+                            verbose=APP_SETTINGS['verbose'])
         self.submits[submit_id] = submit
         submit.start()
 
@@ -73,7 +111,8 @@ class KolejkaCommunicationServer:
         """Returns True if the HTTP server is currently operational"""
         return self.server_thread.is_alive()
 
-    def add_submit(self, submit_id: str) -> None:
+    def add_submit(self, submit_id: str) -> str:
+        # TODO: adding submit should return url for submit
         """
         Adds a submit record to the local storage. Marks it as 'awaiting checking' for KOLEJKA system.
 
@@ -84,6 +123,7 @@ class KolejkaCommunicationServer:
                 raise ValueError('Submit with id %s already registered.' % submit_id)
             self.submit_dict[submit_id] = Lock()
             self.submit_dict[submit_id].acquire()
+        return f'http://{self.host}:{self.port}/{submit_id}'
 
     def release_submit(self, submit_id: str) -> None:
         """
