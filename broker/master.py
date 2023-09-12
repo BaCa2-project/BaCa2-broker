@@ -8,22 +8,22 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from threading import Thread, Lock
 
 from db.connector import Connection
-from .submit import Submit
+from .submit import TaskSubmit
 
-from settings import KOLEJKA_SRC_DIR
+from settings import KOLEJKA_SRC_DIR, APP_SETTINGS
 
 
 class BrokerMaster:
     def __init__(self,
                  db_string: str,
-                 results_dir: Path,
-                 delete_records: bool = True,
+                 submits_dir: Path,
+                 delete_records: bool = APP_SETTINGS['delete_records'],
                  threads: int = 2,
-                 server_address: tuple[str, int] = ('127.0.0.1', 8080)
+                 server_address: tuple[str, int] = ('127.0.0.1', 15212)
                  ):
         self.connection = Connection(db_string)
         self.delete_records = delete_records
-        self.results_dir = results_dir
+        self.submits_dir = submits_dir
         self.threads = threads
         self.submits = {}
         self.submit_http_server = KolejkaCommunicationServer(*server_address)
@@ -59,8 +59,15 @@ class BrokerMaster:
     def new_submit(self,
                    submit_id: str,
                    package_path: Path,
+                   commit_id: str,
                    submit_path: Path):
-        submit = Submit(self, submit_id, package_path, submit_path)
+        submit = TaskSubmit(self,
+                            submit_id,
+                            package_path,
+                            commit_id,
+                            submit_path,
+                            force_rebuild=APP_SETTINGS['force_rebuild'],
+                            verbose=APP_SETTINGS['verbose'])
         self.submits[submit_id] = submit
         submit.start()
 
@@ -104,7 +111,8 @@ class KolejkaCommunicationServer:
         """Returns True if the HTTP server is currently operational"""
         return self.server_thread.is_alive()
 
-    def add_submit(self, submit_id: str) -> None:
+    def add_submit(self, submit_id: str) -> str:
+        # TODO: adding submit should return url for submit
         """
         Adds a submit record to the local storage. Marks it as 'awaiting checking' for KOLEJKA system.
 
@@ -115,6 +123,7 @@ class KolejkaCommunicationServer:
                 raise ValueError('Submit with id %s already registered.' % submit_id)
             self.submit_dict[submit_id] = Lock()
             self.submit_dict[submit_id].acquire()
+        return f'http://{self.host}:{self.port}/{submit_id}'
 
     def release_submit(self, submit_id: str) -> None:
         """

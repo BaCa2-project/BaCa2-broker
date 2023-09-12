@@ -289,3 +289,9 @@ cython_debug/
 **/.build/
 
 kolejka_src/
+submits/
+
+# Config file for kolejka server
+
+*/kolejka.conf
+kolejka.conf
