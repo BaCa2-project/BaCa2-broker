@@ -6,7 +6,7 @@ from sqlite3 import connect
 
 import requests
 
-from .message import BrokerToBaca, BacaToBroker
+from broker.message import BrokerToBaca, BacaToBroker
 
 
 class RequestStatus:

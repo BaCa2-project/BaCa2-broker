@@ -7,11 +7,15 @@ MODES = {
         'delete_records': False,
         'verbose': False,
         'force_rebuild': False,
+        'server_ip': 'http://baca2.ii.uj.edu.pl',
+        'server_port': 9012
     },
     'development': {
         'delete_records': True,
         'verbose': True,
         'force_rebuild': True,
+        'server_ip': '127.0.0.1',
+        'server_port': 9012
     }
 }
 APP_MODE = 'development'

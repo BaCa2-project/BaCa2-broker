@@ -2,7 +2,7 @@
 from pathlib import Path
 import yaml
 
-from .message import BrokerToBaca, Test
+from broker.message import BrokerToBaca, Test
 
 
 def parse_from_kolejka(course: str, submit_id: int, directory: Path) -> BrokerToBaca:

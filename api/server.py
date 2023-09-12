@@ -1,4 +1,6 @@
+from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from abc import ABC, abstractmethod
 from threading import Thread
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -6,7 +8,10 @@ import cgi
 import json
 
 from .manager import BacaApiManager
-from .message import BacaToBroker
+from broker.message import BacaToBroker
+
+if TYPE_CHECKING:
+    from broker.master import BrokerMaster
 
 
 class BacaApiServerAbstract(ABC):
@@ -24,10 +29,12 @@ class BacaApiServerAbstract(ABC):
 class BacaApiServer(BacaApiServerAbstract):
 
     def __init__(self,
+                 broker_master: BrokerMaster,
                  manager: BacaApiManager,
                  server_ip: str = '127.0.0.1',
                  server_port: int = 8180
                  ):
+        self.broker_master = broker_master
         self.manager = manager
         self.server_ip: str = server_ip
         self.server_port: int = server_port
@@ -50,7 +57,11 @@ class BacaApiServer(BacaApiServerAbstract):
 
 class ThreadingHTTPServer2(ThreadingHTTPServer):
 
-    def __init__(self, manager: BacaApiServer, *args, **kwargs):
+    def __init__(self,
+                 broker_master: BrokerMaster,
+                 manager: BacaApiServer,
+                 *args, **kwargs):
+        self.broker_master = broker_master
         self.manager = manager
         super().__init__(*args, **kwargs)
 
@@ -85,5 +96,10 @@ class BacaApiHandler(BaseHTTPRequestHandler):
 
         self.send_response(200)
         self.end_headers()
-        self.server.manager.manager.insert(content)
+        # TODO: create submit id from course name and baca2 submit_id; use commit_id to identify package
+        # FIXME: to delete: self.server.manager.manager.insert(content)
+        self.server.broker_master.new_submit(new_submit_id,
+                                             content.package_path,
+                                             content.commit_id,
+                                             content.submit_path)
         # TODO: Start checking process here

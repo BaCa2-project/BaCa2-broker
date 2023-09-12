@@ -19,6 +19,8 @@ from settings import BUILD_NAMESPACE, KOLEJKA_CONF
 from typing import TYPE_CHECKING
 from shlex import quote as shlex_quote
 
+from .message import SetResult
+
 if TYPE_CHECKING:
     from .master import BrokerMaster
 
@@ -84,6 +86,7 @@ class TaskSubmit(Thread):
         self.verbose = verbose
         self.sets = []
         self._submit_update_lock = Lock()
+        self._gather_results_lock = Lock()
         self.sets_statuses = {
             SubmitState.ADOPTING: 0,
             SubmitState.SENDING: 0,
@@ -106,6 +109,7 @@ class TaskSubmit(Thread):
         if self.task_submit_dir.is_dir():
             shutil.rmtree(self.task_submit_dir)
         self.task_submit_dir.mkdir()
+        self.results = {}
 
     def vprint(self, msg: str):
         if self.verbose:
@@ -143,8 +147,11 @@ class TaskSubmit(Thread):
         if self.sets_statuses[status] == len(self.sets):
             self._change_state(status)
 
-    def close_set_submit(self, set_name: str):
-        pass
+    def close_set_submit(self, set_name: str, results: SetResult):
+        with self._gather_results_lock:
+            self.results[set_name] = results
+        if len(self.results) == len(self.sets):
+            self._change_state(SubmitState.DONE)
 
     def _call_for_update(self, success: bool, msg: str = None):
         pass
@@ -316,6 +323,10 @@ class SetSubmit(Thread):
 
         return True
 
+    def _parse_results(self) -> SetResult:
+        # TODO: Mateusz
+        results_yaml = self.result_dir / 'results' / 'results.yaml'
+
     def process(self):
         self._change_state(SubmitState.SENDING)
         self._send_submit()
@@ -325,8 +336,11 @@ class SetSubmit(Thread):
         self._await_results(timeout=60, active_wait=True)
 
         self._change_state(SubmitState.SAVING)
+        results = self._parse_results()
 
         self._change_state(SubmitState.DONE)
+        self.task_submit.close_set_submit(self.set_name, results)
+
 
     def run(self):
         try:

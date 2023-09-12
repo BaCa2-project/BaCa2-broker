@@ -11,7 +11,7 @@ from dataclasses import asdict
 
 import requests
 
-from api.message import *
+from broker.message import *
 from api.manager import BacaApiManager
 from api.server import BacaApiServer
 

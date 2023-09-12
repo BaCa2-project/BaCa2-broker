@@ -38,3 +38,7 @@ def get_dumper():
     # dumper.add_representer(Include, Include.to_yaml)
     dumper.add_representer(File, file_representer)
     return dumper
+
+def get_loader():
+    pass
+    #TODO: add loader for !file tag

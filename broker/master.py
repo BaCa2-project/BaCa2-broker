@@ -9,6 +9,7 @@ from threading import Thread, Lock
 
 from db.connector import Connection
 from .submit import TaskSubmit
+from api.server import BacaApiServer
 
 from settings import KOLEJKA_SRC_DIR, APP_SETTINGS
 
@@ -19,15 +20,18 @@ class BrokerMaster:
                  submits_dir: Path,
                  delete_records: bool = APP_SETTINGS['delete_records'],
                  threads: int = 2,
-                 server_address: tuple[str, int] = ('127.0.0.1', 15212)
+                 # server_address: tuple[str, int] = ('127.0.0.1', 15212)
                  ):
         self.connection = Connection(db_string)
         self.delete_records = delete_records
         self.submits_dir = submits_dir
         self.threads = threads
         self.submits = {}
-        self.submit_http_server = KolejkaCommunicationServer(*server_address)
+        self.submit_http_server = KolejkaCommunicationServer(APP_SETTINGS['server_ip'], APP_SETTINGS['server_port'])
         self.submit_http_server.start_server()
+        self.api_server = BacaApiServer(self,
+                                        server_ip=APP_SETTINGS['server_ip'],
+                                        server_port=APP_SETTINGS['server_port'])
 
     def __del__(self):
         self.submit_http_server.stop_server()
@@ -70,6 +74,9 @@ class BrokerMaster:
                             verbose=APP_SETTINGS['verbose'])
         self.submits[submit_id] = submit
         submit.start()
+
+    def submit_results(self, submit_id: str, results):
+        pass
 
     def close_submit(self, submit_id: str):
         if self.submits.get(submit_id) is not None:
