@@ -187,20 +187,16 @@ class _KolejkaCommunicationHandler(BaseHTTPRequestHandler):
         super().__init__(request, client_address, server)
         self.server: ThreadingHTTPServer2 = server
 
-    def do_GET(self):  # TODO rewrite this entire method
+    def do_POST(self):
         """Handles http requests."""
         manager: KolejkaCommunicationServer = self.server.manager
-        submit_id = ''.join(filter(lambda x: x != '/', self.path))
+        submit_id = self.path
+        if not submit_id.isalnum():
+            return
         try:
             manager.release_submit(submit_id)
         except (KeyError, ValueError):
-            self.send_response(404)
-            self.end_headers()
-            self.wfile.write(b'F')
-        else:
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b'S')
+            pass
 
     def log_message(self, format: str, *args) -> None:
         pass

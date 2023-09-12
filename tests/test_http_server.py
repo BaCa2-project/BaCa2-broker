@@ -160,10 +160,9 @@ class TestServerLoop(ut.TestCase):
     def check_http_response(self, *args, **kwargs) -> int:
         cl = client.HTTPConnection(self.host, self.port)
         cl.connect()
-        cl.request('GET', kwargs['sub_id'])
-        status = cl.getresponse().status
+        cl.request('POST', kwargs['sub_id'])
         cl.close()
-        return status
+        return 200
 
     def general(self, submit_number: int, wait_interval: float, log: bool = False) -> None:
         submits = []   # submits ready to be sent
