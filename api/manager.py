@@ -1,4 +1,3 @@
-
 from typing import Callable
 from dataclasses import asdict
 import datetime as dt
@@ -30,8 +29,7 @@ class BacaApiManager:
         """
         self.baca_url: str = baca_api_url
         self.parser: Callable[[str, int, Path], BrokerToBaca] = result_parser
-        self.database: Path = database
-        self.con = connect(str(self.database.absolute()))
+        self.database: Path = database.absolute()
 
     @staticmethod
     def _generate_submit_id(course: str, submit_id: int):
@@ -41,8 +39,9 @@ class BacaApiManager:
         """
         :return: request_id, which is used as `id` in both `submit_records` and `baca_requests` tables
         """
+        con = connect(self.database)
         request_id = self._generate_submit_id(message.course_name, message.submit_id)
-        cur = self.con.execute(
+        cur = con.execute(
             '''
             INSERT INTO
                 baca_requests(id, course, submit_id, submit_path, package_path, mod_time, state)
@@ -52,51 +51,60 @@ class BacaApiManager:
             (request_id, message.course_name, message.submit_id, str(message.solution_path), str(message.package_path),
              dt.datetime.now(), RequestStatus.RECEIVED)
         )
-        if cur.rowcount != 1:
-            self.con.rollback()
-            raise ValueError(f"Entry for {request_id} already exists.")
-        self.con.commit()
+        assert cur.rowcount == 1
+        con.commit()
+        con.close()
         return request_id
 
     def _mark_checked(self, request_id: str) -> None:
-        cur = self.con.execute('SELECT package_path, submit_path, state FROM baca_requests WHERE id = ?',
-                               (request_id,))
+        con = connect(self.database)
+        cur = con.execute('SELECT package_path, submit_path, state FROM baca_requests WHERE id = ?',
+                          (request_id,))
         tmp = cur.fetchone()
         if tmp is None:
+            con.close()
             raise KeyError(f"No entry for id '{request_id}'.")
 
         # package_path, submit_path, state = tmp
         # if state != RequestStatus.RECEIVED:
+        #     con.close()
         #     raise ValueError("Entry has to be marked as 'RECEIVED' in order to be checked.")
 
-        cur = self.con.execute('UPDATE baca_requests SET state = ?, mod_time = ? WHERE id = ?',
-                               (RequestStatus.CHECKED, dt.datetime.now(), request_id))
+        cur = con.execute('UPDATE baca_requests SET state = ?, mod_time = ? WHERE id = ?',
+                          (RequestStatus.CHECKED, dt.datetime.now(), request_id))
         assert cur.rowcount == 1
-        self.con.commit()
+        con.commit()
+        con.close()
 
     def _send(self, request_id: str, result_path: Path) -> None:
-        cur = self.con.execute('SELECT course, submit_id, state FROM baca_requests WHERE id = ?',
-                               (request_id,))
+        con = connect(self.database)
+        cur = con.cursor()
+        cur.execute('SELECT course, submit_id, state FROM baca_requests WHERE id = ?',
+                    (request_id,))
         tmp = cur.fetchone()
         if tmp is None:
+            con.close()
             raise KeyError(f"No entry for id '{request_id}'.")
 
         course, submit_id, state = tmp
         if state not in [RequestStatus.CHECKED, RequestStatus.SENDING_ERROR]:
+            con.close()
             raise ValueError("Entry has to be marked as 'CHECKED' or 'SENDING_ERROR' in order to be send.")
 
         message = self.parser(course, submit_id, result_path)
         r = requests.post(url=f'{self.baca_url}/result/{course}/{submit_id}', json=asdict(message))
         if r.status_code != 200:
-            self.con.execute('UPDATE baca_requests SET state = ?, mod_time = ? WHERE id = ?',
-                             (RequestStatus.SENDING_ERROR, dt.datetime.now(), request_id))
-            self.con.commit()
+            cur.execute('UPDATE baca_requests SET state = ?, mod_time = ? WHERE id = ?',
+                        (RequestStatus.SENDING_ERROR, dt.datetime.now(), request_id))
+            con.commit()
+            con.close()
             raise ConnectionError(f"Results for entry with id {request_id} could not be send;"
                                   f" marked as SENDING_ERROR.")
 
-        cur = self.con.execute('DELETE FROM baca_requests WHERE id = ?', (request_id,))
-        assert cur.lastrowid == 1
-        self.con.commit()
+        cur.execute('DELETE FROM baca_requests WHERE id = ?', (request_id,))
+        assert cur.rowcount == 1
+        con.commit()
+        con.close()
 
     def mark_and_send(self, request_id: str, result_path: Path) -> None:
         self._mark_checked(request_id)
