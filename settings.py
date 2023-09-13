@@ -1,17 +1,24 @@
 # Settings for broker
 from pathlib import Path
 from baca2PackageManager import set_base_dir, add_supported_extensions
+from datetime import timedelta
 
 MODES = {
     'production': {
         'delete_records': False,
         'verbose': False,
         'force_rebuild': False,
+        'default_timeout': timedelta(minutes=10),
+        'default_timestep': timedelta(seconds=10),
+        'active_wait': False,
     },
     'development': {
         'delete_records': True,
         'verbose': True,
         'force_rebuild': True,
+        'default_timeout': timedelta(seconds=20),
+        'default_timestep': timedelta(seconds=2),
+        'active_wait': True,
     }
 }
 APP_MODE = 'development'

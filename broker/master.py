@@ -11,6 +11,7 @@ from db.connector import Connection
 from .submit import TaskSubmit
 
 from settings import KOLEJKA_SRC_DIR, APP_SETTINGS
+from .timeout import TimeoutManager
 
 
 class BrokerMaster:
@@ -28,9 +29,11 @@ class BrokerMaster:
         self.submits = {}
         self.submit_http_server = KolejkaCommunicationServer(*server_address)
         self.submit_http_server.start_server()
+        self.timeout_manager = TimeoutManager()
 
     def __del__(self):
         self.submit_http_server.stop_server()
+        self.timeout_manager.stop()
 
     @staticmethod
     def refresh_kolejka_src(add_executable_attr: bool = True):
