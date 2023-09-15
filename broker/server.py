@@ -7,8 +7,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import cgi
 import json
 
-from .manager import BacaApiManager
-from broker.message import BacaToBroker
+from baca2PackageManager.broker_communication import *
 
 if TYPE_CHECKING:
     from broker.master import BrokerMaster

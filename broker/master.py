@@ -9,7 +9,7 @@ from threading import Thread, Lock
 
 from db.connector import Connection
 from .submit import TaskSubmit
-from api.server import BacaApiServer
+from broker.server import BacaApiServer
 
 from settings import KOLEJKA_SRC_DIR, APP_SETTINGS
 

@@ -13,7 +13,7 @@ import requests
 
 from broker.message import *
 from api.manager import BacaApiManager
-from api.server import BacaApiServer
+from broker.server import BacaApiServer
 
 
 class DummyBacaServer(BaseHTTPRequestHandler):
