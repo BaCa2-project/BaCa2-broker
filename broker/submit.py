@@ -11,6 +11,7 @@ from time import sleep
 from copy import deepcopy
 
 import requests
+import yaml
 from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import *
 from .builder import Builder
@@ -18,6 +19,7 @@ from settings import BUILD_NAMESPACE, KOLEJKA_CONF
 
 from typing import TYPE_CHECKING
 
+from .yaml_tags import get_loader
 
 if TYPE_CHECKING:
     from .master import BrokerMaster
@@ -328,7 +330,7 @@ class SetSubmit(Thread):
 
         result_get = [self.python_call,
                       self.task_submit.kolejka_client,
-                        '--config-file', KOLEJKA_CONF,
+                      '--config-file', KOLEJKA_CONF,
                       'result', 'get',
                       self.result_code,
                       self.result_dir]
@@ -352,8 +354,23 @@ class SetSubmit(Thread):
         return True
 
     def _parse_results(self) -> SetResult:
-        # TODO: Mateusz
+        # TODO: test code
+        # TODO: add assertion about status
         results_yaml = self.result_dir / 'results' / 'results.yaml'
+        with open(results_yaml) as f:
+            content: dict = yaml.load(f, get_loader())
+        tests = {}
+        for key, val in content.items():
+            satori = val['satori']
+            tmp = TestResult(
+                name=key,
+                status=satori['status'],
+                time_real=float(satori['execute_time_real'][:-1]),
+                time_cpu=float(satori['execute_time_cpu'][:-1]),
+                runtime_memory=int(satori['execute_memory'][:-1])
+            )
+            tests[key] = tmp
+        return SetResult(name=self.name, tests=tests)
 
     def process(self):
         self._change_state(SubmitState.SENDING)
