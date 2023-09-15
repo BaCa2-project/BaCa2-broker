@@ -6,7 +6,7 @@ from sqlite3 import connect
 
 import requests
 
-from broker.message import BrokerToBaca, BacaToBroker
+from baca2PackageManager.broker_communication import *
 
 
 class RequestStatus:

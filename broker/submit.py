@@ -8,9 +8,11 @@ from pathlib import Path
 from enum import Enum
 from datetime import datetime
 from time import sleep
+from copy import deepcopy
 
+import requests
 from baca2PackageManager import Package
-from baca2PackageManager.broker_communication import SetResult
+from baca2PackageManager.broker_communication import *
 from .builder import Builder
 from settings import BUILD_NAMESPACE, KOLEJKA_CONF
 
@@ -19,6 +21,15 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .master import BrokerMaster
+
+# TODO: MOVE TO SOME OTHER SETTINGS FILE
+# {
+BACA_URL = ''
+# Passwords for protecting communication channels between the broker and BaCa2.
+# PASSWORDS HAVE TO DIFFERENT IN ORDER TO BE EFFECTIVE
+BACA_PASSWORD = 'tmp-baca-password'
+BROKER_PASSWORD = 'tmp-broker-password'
+# }
 
 
 def _translate_paths(*args):
@@ -53,6 +64,8 @@ class SubmitState(Enum):
     SAVING = 6
     #: Judging process ended successfully.
     DONE = 200
+    #: Submit results successfully sent to BaCa2
+    RETURNED = 201
 
 
 class TaskSubmit(Thread):
@@ -148,6 +161,8 @@ class TaskSubmit(Thread):
             self.results[set_name] = results
         if len(self.results) == len(self.sets):
             self._change_state(SubmitState.DONE)
+            # TODO: verify
+            self._send_to_baca(BACA_URL, BACA_PASSWORD)
 
     def _call_for_update(self, success: bool, msg: str = None):
         pass
@@ -172,6 +187,23 @@ class TaskSubmit(Thread):
     def _check_build(self):
         # TODO: Consult package checking
         return True
+
+    def _send_to_baca(self, baca_url: str, password: str) -> None:
+        if self.state != SubmitState.DONE:
+            raise ValueError(f"Submit state has to be 'DONE' not '{repr(self.state)}'.")
+        message = BrokerToBaca(
+            pass_hash=make_hash(password, self.submit_id),
+            submit_id=self.submit_id,
+            results=deepcopy(self.results)  # TODO: verify if deepcopy is appropriate here
+        )
+        try:
+            r = requests.post(url=f'{baca_url}/result/{self.submit_id}', json=message.serialize())
+        except Exception as e:
+            self._change_state(SubmitState.ERROR, error_msg='Error when sending back to BaCa2: ' + str(e))
+            raise e
+        if r.status_code != 200:
+            raise ConnectionError(f"Results for TaskSubmit with id {self.submit_id} could not be send.")
+        self._change_state(SubmitState.RETURNED)
 
     def process(self):
         self._change_state(SubmitState.AWAITING_PREPROC)
