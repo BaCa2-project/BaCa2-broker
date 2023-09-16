@@ -256,7 +256,7 @@ class SetSubmit(Thread):
 
         self.submit_path = submit_path
         self._conn = master.connection
-        self.submit_http_server = master.submit_http_server
+        self.submit_http_server = master.kolejka_manager
 
         self._conn.exec("INSERT INTO set_submit_records VALUES (NULL, ?, ?, NULL, ?)",
                         self.submit_id, self.set_name, self.state)
@@ -293,8 +293,10 @@ class SetSubmit(Thread):
         self._call_for_update()
 
     def _send_submit(self):
-        self.callback_url = self.submit_http_server.add_submit(f'{self.submit_id}_{self.set_name}')
-        # TODO: adding submit should return url
+        set_id = f'{self.submit_id}_{self.set_name}'
+        self.submit_http_server.add_submit(set_id)
+        self.callback_url = self.master.broker_server.get_kolejka_callback_url(set_id)
+        # TODO: check if the above is OK
 
         cmd_judge = [self.python_call, self.task_submit.kolejka_judge,
                      'task',
@@ -324,7 +326,7 @@ class SetSubmit(Thread):
         if client_status.returncode != 0:
             raise self.KOLEJKACommunicationFailed('KOLEJKA client failed to communicate with KOLEJKA server.')
 
-    def _await_results(self, timeout: float = -1, active_wait:bool = False) -> bool:
+    def _await_results(self, timeout: float = -1, active_wait: bool = False) -> bool:
         if not active_wait:
             self.submit_http_server.await_submit(self.set_submit_url, timeout)
 

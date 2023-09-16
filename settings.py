@@ -15,7 +15,7 @@ MODES = {
         'verbose': True,
         'force_rebuild': True,
         'server_ip': '127.0.0.1',
-        'server_port': 9012
+        'server_port': 9014
     }
 }
 APP_MODE = 'development'
