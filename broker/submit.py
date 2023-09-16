@@ -15,7 +15,7 @@ import yaml
 from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import *
 from .builder import Builder
-from settings import BUILD_NAMESPACE, KOLEJKA_CONF
+from settings import BUILD_NAMESPACE, KOLEJKA_CONF, BACA_PASSWORD, BACA_URL
 
 from typing import TYPE_CHECKING
 
@@ -23,15 +23,6 @@ from .yaml_tags import get_loader
 
 if TYPE_CHECKING:
     from .master import BrokerMaster
-
-# TODO: MOVE TO SOME OTHER SETTINGS FILE
-# {
-BACA_URL = ''
-# Passwords for protecting communication channels between the broker and BaCa2.
-# PASSWORDS HAVE TO DIFFERENT IN ORDER TO BE EFFECTIVE
-BACA_PASSWORD = 'tmp-baca-password'
-BROKER_PASSWORD = 'tmp-broker-password'
-# }
 
 
 def _translate_paths(*args):

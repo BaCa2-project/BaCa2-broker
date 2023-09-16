@@ -6,14 +6,14 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import cgi
 import json
 
-from settings import APP_SETTINGS
+from settings import APP_SETTINGS, BROKER_PASSWORD
 from baca2PackageManager.broker_communication import *
 
 if TYPE_CHECKING:
     from broker.master import BrokerMaster
 
 
-class KolejkaCommunicationServer:
+class KolejkaCommunicationManager:
     """
     Manages a http server that listens for updates from KOLEJKA system about submit records' statuses.
     Provides methods for awaiting calls from KOLEJKA system.
@@ -85,16 +85,16 @@ class KolejkaCommunicationServer:
 class BrokerIOServer:
 
     def __init__(self,
-                 kolejka_manager: KolejkaCommunicationServer,
+                 kolejka_manager: KolejkaCommunicationManager,
                  broker_master: BrokerMaster
                  ):
         self.ip = APP_SETTINGS['server_ip']
         self.port = APP_SETTINGS['server_port']
-        self.server = ThreadingHTTPServer2(kolejka_manager,
-                                           broker_master,
-                                           server_address=(self.ip, self.port),
-                                           RequestHandlerClass=BrokerServerHandler
-                                           )
+        self.server = ThreadingHTTPBrokerServer(kolejka_manager,
+                                                broker_master,
+                                                server_address=(self.ip, self.port),
+                                                RequestHandlerClass=BrokerServerHandler
+                                                )
         self.server_thread = Thread(target=self.server.serve_forever)
         self.server_thread.start()
 
@@ -110,10 +110,10 @@ class BrokerIOServer:
         return f'http://{self.ip}:{self.port}/{BrokerServerHandler.KOLEJKA_PATH}/{submit_id}'
 
 
-class ThreadingHTTPServer2(ThreadingHTTPServer):
+class ThreadingHTTPBrokerServer(ThreadingHTTPServer):
 
     def __init__(self,
-                 kolejka_manager: KolejkaCommunicationServer,
+                 kolejka_manager: KolejkaCommunicationManager,
                  broker_master: BrokerMaster,
                  *args, **kwargs):
         self.kolejka_manager = kolejka_manager
@@ -134,9 +134,9 @@ class BrokerServerHandler(BaseHTTPRequestHandler):
     KOLEJKA_PATH = 'kolejka'
     BACA_PATH = 'baca'
 
-    def __init__(self, request: bytes, client_address: tuple[str, int], server: ThreadingHTTPServer2):
+    def __init__(self, request: bytes, client_address: tuple[str, int], server: ThreadingHTTPBrokerServer):
         super().__init__(request, client_address, server)
-        self.server: ThreadingHTTPServer2 = server
+        self.server: ThreadingHTTPBrokerServer = server
 
     def do_HEAD(self):
         self.send_response(200)
@@ -155,7 +155,7 @@ class BrokerServerHandler(BaseHTTPRequestHandler):
                 self.end_headers()
 
     def kolejka_post(self, suffix: list[str]):
-        manager: KolejkaCommunicationServer = self.server.kolejka_manager
+        manager: KolejkaCommunicationManager = self.server.kolejka_manager
         submit_id = suffix[0]
         if not submit_id.isalnum():
             self.send_response(400)
@@ -182,8 +182,14 @@ class BrokerServerHandler(BaseHTTPRequestHandler):
             message = json.loads(self.rfile.read(length))
             content = BacaToBroker.parse(message)
         except Exception as e:
-            self.wfile.write(str(e))
+            self.wfile.write(str(e).encode('utf-8'))
             self.send_response(400)
+            self.end_headers()
+            return
+
+        if make_hash(BROKER_PASSWORD, content.submit_id) != content.pass_hash:
+            self.wfile.write('Wrong Password.'.encode('utf-8'))
+            self.send_response(401)
             self.end_headers()
             return
 

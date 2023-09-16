@@ -5,13 +5,13 @@ from threading import Thread, Lock
 from time import sleep
 import requests
 
-from broker.server import KolejkaCommunicationServer, BrokerIOServer, BrokerServerHandler
+from broker.server import KolejkaCommunicationManager, BrokerIOServer, BrokerServerHandler
 
 
 class DetailedTests(ut.TestCase):
 
     def setUp(self) -> None:
-        self.manager = KolejkaCommunicationServer()
+        self.manager = KolejkaCommunicationManager()
 
     def test_add_submit(self) -> None:
         def add_after_time(time: float, sub_id: str):
@@ -135,7 +135,7 @@ class TestServerLoop(ut.TestCase):
     _log = True
 
     def setUp(self) -> None:
-        self.manager = KolejkaCommunicationServer()
+        self.manager = KolejkaCommunicationManager()
         self.server = BrokerIOServer(self.manager, None)
         self.host = self.server.ip
         self.port = self.server.port

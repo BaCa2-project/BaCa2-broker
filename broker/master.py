@@ -7,7 +7,7 @@ from pathlib import Path
 
 from db.connector import Connection
 from .submit import TaskSubmit
-from .server import KolejkaCommunicationServer, BrokerIOServer
+from .server import KolejkaCommunicationManager, BrokerIOServer
 
 from settings import KOLEJKA_SRC_DIR, APP_SETTINGS
 
@@ -24,7 +24,7 @@ class BrokerMaster:
         self.submits_dir = submits_dir
         self.threads = threads
         self.submits = {}
-        self.kolejka_manager = KolejkaCommunicationServer()
+        self.kolejka_manager = KolejkaCommunicationManager()
         self.broker_server = BrokerIOServer(self.kolejka_manager, self)
 
     def __del__(self):

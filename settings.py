@@ -42,3 +42,9 @@ BUILD_NAMESPACE = 'kolejka'
 
 set_base_dir(PACKAGES_DIR)
 add_supported_extensions('cpp')
+
+BACA_URL = ''
+# Passwords for protecting communication channels between the broker and BaCa2.
+# PASSWORDS HAVE TO DIFFERENT IN ORDER TO BE EFFECTIVE
+BACA_PASSWORD = 'tmp-baca-password'
+BROKER_PASSWORD = 'tmp-broker-password'
