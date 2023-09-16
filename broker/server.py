@@ -159,11 +159,14 @@ class BrokerServerHandler(BaseHTTPRequestHandler):
         submit_id = suffix[0]
         if not submit_id.isalnum():
             self.send_response(400)
+            self.end_headers()
+            return
         try:
             manager.release_submit(submit_id)
             self.send_response(200)
         except (KeyError, ValueError):
             self.send_response(400)
+        self.end_headers()
 
     def baca_post(self, suffix: list[str]):
         type_, pdict = cgi.parse_header(self.headers.get('content-type'))
@@ -174,11 +177,12 @@ class BrokerServerHandler(BaseHTTPRequestHandler):
             return
 
         length = int(self.headers.get('content-length'))
-        message = json.loads(self.rfile.read(length))
 
         try:
-            content = BacaToBroker(**message)
-        except Exception as e:  # TODO
+            message = json.loads(self.rfile.read(length))
+            content = BacaToBroker.parse(message)
+        except Exception as e:
+            self.wfile.write(str(e))
             self.send_response(400)
             self.end_headers()
             return
