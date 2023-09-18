@@ -10,6 +10,7 @@ from .submit import TaskSubmit
 from .server import KolejkaCommunicationManager, BrokerIOServer
 
 from settings import KOLEJKA_SRC_DIR, APP_SETTINGS
+from .timeout import TimeoutManager
 
 
 class BrokerMaster:
@@ -26,9 +27,11 @@ class BrokerMaster:
         self.submits = {}
         self.kolejka_manager = KolejkaCommunicationManager()
         self.broker_server = BrokerIOServer(self.kolejka_manager, self)
+        self.timeout_manager = TimeoutManager()
 
     def __del__(self):
         self.broker_server.close_server()
+        self.timeout_manager.stop()
 
     @staticmethod
     def refresh_kolejka_src(add_executable_attr: bool = True):

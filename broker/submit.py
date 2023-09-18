@@ -15,7 +15,7 @@ import yaml
 from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import *
 from .builder import Builder
-from settings import BUILD_NAMESPACE, KOLEJKA_CONF, BACA_PASSWORD, BACA_URL
+from settings import BUILD_NAMESPACE, KOLEJKA_CONF, BACA_PASSWORD, BACA_URL, APP_SETTINGS
 
 from typing import TYPE_CHECKING
 
@@ -59,6 +59,14 @@ class SubmitState(Enum):
     DONE = 200
 
 
+class CallbackStatus(Enum):
+    NOT_SENT = 0
+    SENT = 1
+    RECEIVED = 2
+    TIMEOUT = 3
+    ERROR = 4
+
+
 class TaskSubmit(Thread):
     class BaCa2CommunicationError(Exception):
         pass
@@ -100,6 +108,7 @@ class TaskSubmit(Thread):
             SubmitState.SAVING: 0,
             SubmitState.DONE: 0,
             SubmitState.ERROR: 0,
+            SubmitState.CANCELED: 0,
         }
         self._conn = master.connection
         self._conn.exec("INSERT INTO submit_records VALUES (?, ?, ?, ?, ?, ?, NULL, ?)",
@@ -116,6 +125,7 @@ class TaskSubmit(Thread):
             shutil.rmtree(self.task_submit_dir)
         self.task_submit_dir.mkdir()
         self.results = {}
+        self.active_wait = APP_SETTINGS['active_wait']
 
     def vprint(self, msg: str):
         if self.verbose:
@@ -124,9 +134,9 @@ class TaskSubmit(Thread):
     def _change_state(self, state: SubmitState, error_msg: str = None):
         self.state = state
         if state == SubmitState.DONE and self.master.delete_records:
-                self._conn.exec("DELETE FROM submit_records WHERE id = ?", self.submit_id, )
-            # TODO: Check if following exits thread.
-            # self.master.close_submit()
+            self._conn.exec("DELETE FROM submit_records WHERE id = ?", self.submit_id, )
+        # TODO: Check if following exits thread.
+        # self.master.close_submit()
         else:
             self._conn.exec("UPDATE submit_records SET state=?, error_msg=? WHERE id=?",
                             state, error_msg, self.submit_id)
@@ -150,8 +160,15 @@ class TaskSubmit(Thread):
         self._submit_update_lock.acquire()
         self.sets_statuses[status] += 1
         self._submit_update_lock.release()
+        end_statuses = (self.sets_statuses[SubmitState.ERROR] +
+                        self.sets_statuses[SubmitState.DONE] +
+                        self.sets_statuses[SubmitState.CANCELED])
         if self.sets_statuses[status] == len(self.sets) and status not in (SubmitState.DONE, SubmitState.SAVING):
             self._change_state(status)
+        elif end_statuses == len(self.sets):
+            ok_statuses = self.sets_statuses[SubmitState.DONE]
+            self._change_state(SubmitState.ERROR,
+                               f'Some sets ended with an error ({ok_statuses}/{len(self.sets)} OK)')
 
     def close_set_submit(self, set_name: str, results: SetResult):
         with self._gather_results_lock:
@@ -253,6 +270,7 @@ class SetSubmit(Thread):
         self.package = package
         self.set_name = set_name
         self.callback_url = None
+        self.set_submit_id = f'{self.submit_id}_{self.set_name}'
 
         self.submit_path = submit_path
         self._conn = master.connection
@@ -269,6 +287,7 @@ class SetSubmit(Thread):
         else:
             self.python_call = 'python3'
 
+        self.callback_status = CallbackStatus.NOT_SENT
         # self._call_for_update()
 
     def vprint(self, msg: str):
@@ -283,11 +302,12 @@ class SetSubmit(Thread):
             self._conn.exec("DELETE FROM set_submit_records WHERE submit_id=? AND set_name=?",
                             self.submit_id, self.set_name)
             # TODO: Check if following exits thread.
-        elif state == SubmitState.DONE or state == SubmitState.ERROR:
-            self.task_submit.close_set_submit(self.set_name)
         else:
             self._conn.exec("UPDATE set_submit_records SET state=?, error_msg=? WHERE submit_id=? AND set_name=?",
                             state, error_msg, self.submit_id, self.set_name)
+
+        if state == SubmitState.DONE or state == SubmitState.ERROR:
+            self.task_submit.close_set_submit(self.set_name)
         if self.task_submit.verbose:
             self.vprint(f'Changed state to {state.value} ({state.name})')
         self._call_for_update()
@@ -325,11 +345,9 @@ class SetSubmit(Thread):
 
         if client_status.returncode != 0:
             raise self.KOLEJKACommunicationFailed('KOLEJKA client failed to communicate with KOLEJKA server.')
+        self.callback_status = CallbackStatus.SENT
 
-    def _await_results(self, timeout: float = -1, active_wait: bool = False) -> bool:
-        if not active_wait:
-            self.submit_http_server.await_submit(self.set_submit_url, timeout)
-
+    def results_get(self) -> bool:
         result_get = [self.python_call,
                       self.task_submit.kolejka_client,
                       '--config-file', KOLEJKA_CONF,
@@ -341,17 +359,49 @@ class SetSubmit(Thread):
 
         result_status = subprocess.run(result_get, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        if not active_wait:
-            if result_status.returncode != 0:
-                raise self.KOLEJKACommunicationFailed('KOLEJKA client failed to communicate with KOLEJKA server.')
+        if result_status.returncode == 0:
+            return True
         else:
-            time_track = 0
-            while result_status.returncode != 0:
-                sleep(self.task_submit.TIMEOUT_STEP)
-                time_track += self.task_submit.TIMEOUT_STEP
-                result_status = subprocess.run(result_get, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                if 0 < timeout < time_track:
-                    raise self.KOLEJKACommunicationFailed('Reached timeout while waiting for KOLEJKA response.')
+            return False
+
+    def success_ping(self, success: bool) -> None:
+        if success:
+            self.callback_status = CallbackStatus.RECEIVED
+        else:
+            self.callback_status = CallbackStatus.TIMEOUT
+
+    def _await_results(self) -> bool:
+        await_results_lock = Lock()
+        if self.task_submit.active_wait:
+            self.master.timeout_manager.add_active_wait(self.set_submit_id,
+                                                        await_results_lock,
+                                                        wait_action=self.results_get,
+                                                        success_ping=self.success_ping, )
+            await_results_lock.acquire()
+            self.master.timeout_manager.remove_active_wait(self.set_submit_id)
+        else:
+            self.master.timeout_manager.add_timeout(self.set_submit_id,
+                                                    await_results_lock,
+                                                    success_ping=self.success_ping, )
+            # TODO: Add server await detached
+            await_results_lock.acquire()
+            self.master.timeout_manager.remove_active_wait(self.set_submit_id)
+
+            results_received = False
+            if self.callback_status == CallbackStatus.TIMEOUT:
+                results_received = self.results_get()
+            if results_received:
+                self.success_ping(True)
+
+        if self.callback_status == CallbackStatus.TIMEOUT:
+            self._change_state(SubmitState.ERROR, 'KOLEJKA callback timeout')
+            raise self.KOLEJKACommunicationFailed('KOLEJKA callback timeout')
+        elif self.callback_status == CallbackStatus.ERROR:
+            self._change_state(SubmitState.ERROR, 'KOLEJKA callback error')
+            raise self.KOLEJKACommunicationFailed('KOLEJKA callback error')
+        elif self.callback_status != CallbackStatus.RECEIVED:
+            self._change_state(SubmitState.ERROR, 'KOLEJKA callback unknown error')
+            raise self.KOLEJKACommunicationFailed('KOLEJKA callback unknown error')
 
         return True
 
@@ -379,8 +429,7 @@ class SetSubmit(Thread):
         self._send_submit()
 
         self._change_state(SubmitState.AWAITING_JUDGE)
-        # TODO: consider adding timeout for safety (otherwise if something goes wrong the method may never return)
-        self._await_results(timeout=60, active_wait=True)
+        self._await_results()
 
         self._change_state(SubmitState.SAVING)
         self.results = self._parse_results()

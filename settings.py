@@ -1,6 +1,7 @@
 # Settings for broker
 from pathlib import Path
 from baca2PackageManager import set_base_dir, add_supported_extensions
+from datetime import timedelta
 
 MODES = {
     'production': {
@@ -8,12 +9,18 @@ MODES = {
         'verbose': False,
         'force_rebuild': False,
         'server_ip': 'http://baca2.ii.uj.edu.pl',
-        'server_port': 9012
+        'server_port': 9012,
+        'default_timeout': timedelta(minutes=10),
+        'default_timestep': timedelta(seconds=10),
+        'active_wait': False,
     },
     'development': {
         'delete_records': True,
         'verbose': True,
         'force_rebuild': True,
+        'default_timeout': timedelta(seconds=20),
+        'default_timestep': timedelta(seconds=2),
+        'active_wait': True,
         'server_ip': '127.0.0.1',
         'server_port': 9014
     }
