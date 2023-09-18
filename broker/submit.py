@@ -246,7 +246,7 @@ class TaskSubmit(Thread):
         try:
             self.process()
         except Exception as e:
-            self._change_state(SubmitState.ERROR, f'{e.__class__.__name__}: {e}\n\n{e.__traceback__}')
+            self._change_state(SubmitState.ERROR, f'{e.__class__.__name__}: {e}')
 
 
 class SetSubmit(Thread):
@@ -305,9 +305,6 @@ class SetSubmit(Thread):
         else:
             self._conn.exec("UPDATE set_submit_records SET state=?, error_msg=? WHERE submit_id=? AND set_name=?",
                             state, error_msg, self.submit_id, self.set_name)
-
-        if state == SubmitState.DONE or state == SubmitState.ERROR:
-            self.task_submit.close_set_submit(self.set_name)
         if self.task_submit.verbose:
             self.vprint(f'Changed state to {state.value} ({state.name})')
         self._call_for_update()
@@ -443,5 +440,5 @@ class SetSubmit(Thread):
         try:
             self.process()
         except Exception as e:
-            self._change_state(SubmitState.ERROR, f'{e.__class__.__name__}: {e}\n\n{e.__traceback__}')
+            self._change_state(SubmitState.ERROR, f'{e.__class__.__name__}: {e}')
             # TODO: error handling for BaCa2 srv
