@@ -189,11 +189,7 @@ class TaskSubmit(Thread):
             submit_id=self.submit_id,
             results=deepcopy(self.results)  # TODO: verify if deepcopy is appropriate here
         )
-        try:
-            r = requests.post(url=f'{baca_url}/result/{self.submit_id}', json=message.serialize())
-        except Exception as e:
-            self._change_state(SubmitState.ERROR, error_msg='Error when sending back to BaCa2: ' + str(e))
-            raise e
+        r = requests.post(url=f'{baca_url}/result/{self.submit_id}', json=message.serialize())
         if r.status_code != 200:
             raise ConnectionError(f"Results for TaskSubmit with id {self.submit_id} could not be send.")
         self._change_state(SubmitState.RETURNED)
