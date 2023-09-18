@@ -29,7 +29,6 @@ class KolejkaCommunicationManager:
         return length
 
     def add_submit(self, submit_id: str) -> None:
-        # TODO: adding submit should return url for submit
         """
         Adds a submit record to the local storage. Marks it as 'awaiting checking' for KOLEJKA system.
 
@@ -83,13 +82,13 @@ class KolejkaCommunicationManager:
 
 
 class BrokerIOServer:
+    ip = APP_SETTINGS['server_ip']
+    port = APP_SETTINGS['server_port']
 
     def __init__(self,
                  kolejka_manager: KolejkaCommunicationManager,
                  broker_master: BrokerMaster
                  ):
-        self.ip = APP_SETTINGS['server_ip']
-        self.port = APP_SETTINGS['server_port']
         self.server = ThreadingHTTPBrokerServer(kolejka_manager,
                                                 broker_master,
                                                 server_address=(self.ip, self.port),
@@ -106,8 +105,9 @@ class BrokerIOServer:
     def __del__(self):
         self.close_server()
 
-    def get_kolejka_callback_url(self, submit_id: str) -> str:
-        return f'http://{self.ip}:{self.port}/{BrokerServerHandler.KOLEJKA_PATH}/{submit_id}'
+    @classmethod
+    def get_kolejka_callback_url(cls, submit_id: str) -> str:
+        return f'http://{cls.ip}:{cls.port}/{BrokerServerHandler.KOLEJKA_PATH}/{submit_id}'
 
 
 class ThreadingHTTPBrokerServer(ThreadingHTTPServer):
