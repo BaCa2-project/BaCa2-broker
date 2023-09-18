@@ -167,8 +167,11 @@ class TaskSubmit(Thread):
             self._change_state(status)
         elif end_statuses == len(self.sets):
             ok_statuses = self.sets_statuses[SubmitState.DONE]
-            self._change_state(SubmitState.ERROR,
-                               f'Some sets ended with an error ({ok_statuses}/{len(self.sets)} OK)')
+            if ok_statuses == len(self.sets):
+                self._change_state(SubmitState.DONE)
+            else:
+                self._change_state(SubmitState.ERROR,
+                                   f'Some sets ended with an error ({ok_statuses}/{len(self.sets)} OK)')
 
     def close_set_submit(self, set_name: str, results: SetResult):
         with self._gather_results_lock:
@@ -246,7 +249,8 @@ class TaskSubmit(Thread):
         try:
             self.process()
         except Exception as e:
-            self._change_state(SubmitState.ERROR, f'{e.__class__.__name__}: {e}')
+            self._change_state(SubmitState.ERROR, f'{e.__class__.__name__}: {e} \n\n '
+                                                  f'{e.__traceback__.tb_lineno} {e.__traceback__.tb_lasti}')
 
 
 class SetSubmit(Thread):
@@ -311,8 +315,11 @@ class SetSubmit(Thread):
 
     def _send_submit(self):
         set_id = f'{self.submit_id}_{self.set_name}'
-        self.submit_http_server.add_submit(set_id)
-        self.callback_url = self.master.broker_server.get_kolejka_callback_url(set_id)
+        if not self.task_submit.active_wait:
+            self.submit_http_server.add_submit(set_id)
+            self.callback_url = self.master.broker_server.get_kolejka_callback_url(set_id)
+        else:
+            self.callback_url = 'localhost'
         # TODO: check if the above is OK
 
         cmd_judge = [self.python_call, self.task_submit.kolejka_judge,
@@ -375,14 +382,14 @@ class SetSubmit(Thread):
                                                         wait_action=self.results_get,
                                                         success_ping=self.success_ping, )
             await_results_lock.acquire()
-            self.master.timeout_manager.remove_active_wait(self.set_submit_id)
+            self.master.timeout_manager.remove_timeout(self.set_submit_id)
         else:
             self.master.timeout_manager.add_timeout(self.set_submit_id,
                                                     await_results_lock,
                                                     success_ping=self.success_ping, )
             # TODO: Add server await detached
             await_results_lock.acquire()
-            self.master.timeout_manager.remove_active_wait(self.set_submit_id)
+            self.master.timeout_manager.remove_timeout(self.set_submit_id)
 
             results_received = False
             if self.callback_status == CallbackStatus.TIMEOUT:
@@ -414,9 +421,12 @@ class SetSubmit(Thread):
             tmp = TestResult(
                 name=key,
                 status=satori['status'],
-                time_real=float(satori['execute_time_real'][:-1]),
-                time_cpu=float(satori['execute_time_cpu'][:-1]),
-                runtime_memory=int(satori['execute_memory'][:-1])
+                time_real=0,
+                time_cpu=0,
+                runtime_memory=0,
+                # time_real=float(satori['execute_time_real'][:-1]),
+                # time_cpu=float(satori['execute_time_cpu'][:-1]),
+                # runtime_memory=int(satori['execute_memory'][:-1])
             )
             tests[key] = tmp
         return SetResult(name=self.set_name, tests=tests)
@@ -435,10 +445,10 @@ class SetSubmit(Thread):
 
         self._change_state(SubmitState.DONE)
 
-
     def run(self):
         try:
             self.process()
         except Exception as e:
-            self._change_state(SubmitState.ERROR, f'{e.__class__.__name__}: {e}')
+            self._change_state(SubmitState.ERROR, f'{e.__class__.__name__}: {e} \n\n '
+                                                  f'{e.__traceback__.tb_lineno} {e.__traceback__.tb_lasti}')
             # TODO: error handling for BaCa2 srv

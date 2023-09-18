@@ -18,7 +18,7 @@ MODES = {
         'delete_records': True,
         'verbose': True,
         'force_rebuild': True,
-        'default_timeout': timedelta(seconds=20),
+        'default_timeout': timedelta(minutes=3),
         'default_timestep': timedelta(seconds=2),
         'active_wait': True,
         'server_ip': '127.0.0.1',
