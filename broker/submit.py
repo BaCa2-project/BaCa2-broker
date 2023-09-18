@@ -167,11 +167,8 @@ class TaskSubmit(Thread):
             self._change_state(status)
         elif end_statuses == len(self.sets):
             ok_statuses = self.sets_statuses[SubmitState.DONE]
-            if ok_statuses == len(self.sets):
-                self._change_state(SubmitState.DONE)
-            else:
-                self._change_state(SubmitState.ERROR,
-                                   f'Some sets ended with an error ({ok_statuses}/{len(self.sets)} OK)')
+            if ok_statuses != len(self.sets):
+                raise self.JudgingError(f'Some sets ended with an error ({ok_statuses}/{len(self.sets)} OK)')
 
     def close_set_submit(self, set_name: str, results: SetResult):
         with self._gather_results_lock:
