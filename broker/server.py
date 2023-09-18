@@ -82,13 +82,13 @@ class KolejkaCommunicationManager:
 
 
 class BrokerIOServer:
+    ip = APP_SETTINGS['server_ip']
+    port = APP_SETTINGS['server_port']
 
     def __init__(self,
                  kolejka_manager: KolejkaCommunicationManager,
                  broker_master: BrokerMaster
                  ):
-        self.ip = APP_SETTINGS['server_ip']
-        self.port = APP_SETTINGS['server_port']
         self.server = ThreadingHTTPBrokerServer(kolejka_manager,
                                                 broker_master,
                                                 server_address=(self.ip, self.port),
