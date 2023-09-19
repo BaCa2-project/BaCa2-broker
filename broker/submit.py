@@ -275,7 +275,7 @@ class SetSubmit(Thread):
 
         self.submit_path = submit_path
         self._conn = master.connection
-        self.submit_http_server = master.kolejka_manager
+        self.kolejka_manager = master.kolejka_manager
 
         self._conn.exec("INSERT INTO set_submit_records VALUES (NULL, ?, ?, NULL, ?)",
                         self.submit_id, self.set_name, self.state)
@@ -313,11 +313,10 @@ class SetSubmit(Thread):
     def _send_submit(self):
         set_id = f'{self.submit_id}_{self.set_name}'
         if not self.task_submit.active_wait:
-            self.submit_http_server.add_submit(set_id)
+            self.kolejka_manager.add_submit(set_id)
             self.callback_url = self.master.broker_server.get_kolejka_callback_url(set_id)
         else:
             self.callback_url = 'localhost'
-        # TODO: check if the above is OK
 
         cmd_judge = [self.python_call, self.task_submit.kolejka_judge,
                      'task',
@@ -372,6 +371,8 @@ class SetSubmit(Thread):
             self.callback_status = CallbackStatus.TIMEOUT
 
     def _await_results(self) -> bool:
+        from settings import APP_SETTINGS
+
         await_results_lock = Lock()
         if self.task_submit.active_wait:
             self.master.timeout_manager.add_active_wait(self.set_submit_id,
@@ -381,12 +382,16 @@ class SetSubmit(Thread):
             await_results_lock.acquire()
             self.master.timeout_manager.remove_timeout(self.set_submit_id)
         else:
-            self.master.timeout_manager.add_timeout(self.set_submit_id,
-                                                    await_results_lock,
-                                                    success_ping=self.success_ping, )
+            # self.master.timeout_manager.add_timeout(self.set_submit_id,
+            #                                         await_results_lock,
+            #                                         success_ping=self.success_ping, )
             # TODO: Add server await detached
-            await_results_lock.acquire()
-            self.master.timeout_manager.remove_timeout(self.set_submit_id)
+            self.success_ping(self.master.kolejka_manager.await_submit(
+                self.set_submit_id,
+                timeout=APP_SETTINGS['default_timeout'].total_seconds())
+            )
+            # await_results_lock.acquire()
+            # self.master.timeout_manager.remove_timeout(self.set_submit_id)
 
             results_received = False
             if self.callback_status == CallbackStatus.TIMEOUT:
@@ -395,13 +400,10 @@ class SetSubmit(Thread):
                 self.success_ping(True)
 
         if self.callback_status == CallbackStatus.TIMEOUT:
-            self._change_state(SubmitState.ERROR, 'KOLEJKA callback timeout')
             raise self.KOLEJKACommunicationFailed('KOLEJKA callback timeout')
         elif self.callback_status == CallbackStatus.ERROR:
-            self._change_state(SubmitState.ERROR, 'KOLEJKA callback error')
             raise self.KOLEJKACommunicationFailed('KOLEJKA callback error')
         elif self.callback_status != CallbackStatus.RECEIVED:
-            self._change_state(SubmitState.ERROR, 'KOLEJKA callback unknown error')
             raise self.KOLEJKACommunicationFailed('KOLEJKA callback unknown error')
 
         return True
@@ -446,6 +448,5 @@ class SetSubmit(Thread):
         try:
             self.process()
         except Exception as e:
-            self._change_state(SubmitState.ERROR, f'{e.__class__.__name__}: {e} \n\n '
-                                                  f'{e.__traceback__.tb_lineno} {e.__traceback__.tb_lasti}')
+            self._change_state(SubmitState.ERROR, f'{e.__class__.__name__}: {e}')
             # TODO: error handling for BaCa2 srv
