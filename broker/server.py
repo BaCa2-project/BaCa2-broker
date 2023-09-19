@@ -158,7 +158,8 @@ class BrokerServerHandler(BaseHTTPRequestHandler):
     def kolejka_post(self, suffix: list[str]):
         manager: KolejkaCommunicationManager = self.server.kolejka_manager
         submit_id = suffix[0]
-        if not submit_id.isalnum():
+        submit_normalized = submit_id.replace('_', '')
+        if not submit_normalized.isalnum():
             self.send_response(400)
             self.end_headers()
             return

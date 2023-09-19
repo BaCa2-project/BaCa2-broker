@@ -6,9 +6,9 @@ from datetime import timedelta
 MODES = {
     'production': {
         'delete_records': False,
-        'verbose': False,
-        'force_rebuild': False,
-        'server_ip': 'http://baca2.ii.uj.edu.pl',
+        'verbose': True,
+        'force_rebuild': True,
+        'server_ip': 'baca2.ii.uj.edu.pl',
         'server_port': 8180,
         'default_timeout': timedelta(minutes=10),
         'default_timestep': timedelta(seconds=10),
