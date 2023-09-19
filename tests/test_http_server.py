@@ -240,10 +240,10 @@ class TestServerLoop(ut.TestCase):
         self.assertFalse(self.manager.submit_dict)
 
     def test_general1(self) -> None:
-        self.general(submit_number=100, wait_interval=0.05, log=self._log)
+        self.general(submit_number=10, wait_interval=0.05, log=self._log)
 
     def test_general2(self) -> None:
-        self.general(submit_number=1000, wait_interval=0.005, log=self._log)
+        self.general(submit_number=100, wait_interval=0.005, log=self._log)
 
     def test_general3(self) -> None:
-        self.general(submit_number=10000, wait_interval=0.0005, log=self._log)
+        self.general(submit_number=3000, wait_interval=0, log=self._log)

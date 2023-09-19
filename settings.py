@@ -9,7 +9,7 @@ MODES = {
         'verbose': False,
         'force_rebuild': False,
         'server_ip': 'http://baca2.ii.uj.edu.pl',
-        'server_port': 9012,
+        'server_port': 8180,
         'default_timeout': timedelta(minutes=10),
         'default_timestep': timedelta(seconds=10),
         'active_wait': False,
@@ -22,7 +22,7 @@ MODES = {
         'default_timestep': timedelta(seconds=2),
         'active_wait': True,
         'server_ip': '127.0.0.1',
-        'server_port': 9014
+        'server_port': 8180,
     }
 }
 APP_MODE = 'development'
@@ -42,8 +42,6 @@ JUDGES = {
 
 DB_STRING = f"{BASE_DIR.absolute() / 'submit_control.db'}"
 # DB_STRING = f"sqlite://submit_control.db"
-
-DELETE_RECORDS = False
 
 BUILD_NAMESPACE = 'kolejka'
 

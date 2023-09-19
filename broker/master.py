@@ -33,6 +33,7 @@ class BrokerMaster:
         self.broker_server.close_server()
         self.timeout_manager.stop()
 
+
     @staticmethod
     def refresh_kolejka_src(add_executable_attr: bool = True):
         if KOLEJKA_SRC_DIR.is_dir():

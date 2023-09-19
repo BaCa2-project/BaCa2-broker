@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 from threading import Lock, Thread
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -189,13 +190,14 @@ class BrokerServerHandler(BaseHTTPRequestHandler):
 
         if make_hash(BROKER_PASSWORD, content.submit_id) != content.pass_hash:
             self.wfile.write('Wrong Password.'.encode('utf-8'))
+            print(f'Unauthorized access attempt from {self.client_address}')
             self.send_response(401)
             self.end_headers()
             return
 
         self.server.broker_master.new_submit(content.submit_id,
-                                             content.package_path,
+                                             Path(content.package_path),
                                              content.commit_id,
-                                             content.submit_path)
+                                             Path(content.submit_path))
         self.send_response(200)
         self.end_headers()
