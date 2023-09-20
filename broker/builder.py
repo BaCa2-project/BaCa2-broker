@@ -61,12 +61,10 @@ class Builder:
                     'storage': '5G',
                     'workspace': '5G',
                 }
-                # TODO:
-                # 'url': callback_url,
             }
         }
         if self.enable_shortcut:
-            test_yaml['satori'] = {
+            test_yaml['kolejka']['satori'] = {
                 'result': {
                     'execute_time_real': '/io/executor/run/real_time',
                     'execute_time_cpu': '/io/executor/run/cpu_time',

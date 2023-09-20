@@ -382,16 +382,10 @@ class SetSubmit(Thread):
             await_results_lock.acquire()
             self.master.timeout_manager.remove_timeout(self.set_submit_id)
         else:
-            # self.master.timeout_manager.add_timeout(self.set_submit_id,
-            #                                         await_results_lock,
-            #                                         success_ping=self.success_ping, )
-            # TODO: Add server await detached
             self.success_ping(self.master.kolejka_manager.await_submit(
                 self.set_submit_id,
                 timeout=APP_SETTINGS['default_timeout'].total_seconds())
             )
-            # await_results_lock.acquire()
-            # self.master.timeout_manager.remove_timeout(self.set_submit_id)
 
             results_received = False
             if self.callback_status == CallbackStatus.TIMEOUT:
@@ -409,7 +403,6 @@ class SetSubmit(Thread):
         return True
 
     def _parse_results(self) -> SetResult:
-        # TODO: test code
         # TODO: add assertion about status
         results_yaml = self.result_dir / 'results' / 'results.yaml'
         with open(results_yaml) as f:
@@ -420,12 +413,9 @@ class SetSubmit(Thread):
             tmp = TestResult(
                 name=key,
                 status=satori['status'],
-                time_real=0,
-                time_cpu=0,
-                runtime_memory=0,
-                # time_real=float(satori['execute_time_real'][:-1]),
-                # time_cpu=float(satori['execute_time_cpu'][:-1]),
-                # runtime_memory=int(satori['execute_memory'][:-1])
+                time_real=float(satori['execute_time_real'][:-1]),
+                time_cpu=float(satori['execute_time_cpu'][:-1]),
+                runtime_memory=int(satori['execute_memory'][:-1])
             )
             tests[key] = tmp
         return SetResult(name=self.set_name, tests=tests)
