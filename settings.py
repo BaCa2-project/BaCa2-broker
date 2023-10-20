@@ -1,21 +1,28 @@
 # Settings for broker
 from pathlib import Path
 from baca2PackageManager import set_base_dir, add_supported_extensions
+from datetime import timedelta
 
 MODES = {
     'production': {
         'delete_records': False,
-        'verbose': False,
-        'force_rebuild': False,
-        'server_ip': 'http://baca2.ii.uj.edu.pl',
-        'server_port': 9012
+        'verbose': True,
+        'force_rebuild': True,
+        'server_ip': 'baca2.ii.uj.edu.pl',
+        'server_port': 8180,
+        'default_timeout': timedelta(minutes=10),
+        'default_timestep': timedelta(seconds=10),
+        'active_wait': False,
     },
     'development': {
         'delete_records': True,
         'verbose': True,
         'force_rebuild': True,
+        'default_timeout': timedelta(minutes=3),
+        'default_timestep': timedelta(seconds=2),
+        'active_wait': True,
         'server_ip': '127.0.0.1',
-        'server_port': 9012
+        'server_port': 8180,
     }
 }
 APP_MODE = 'development'
@@ -36,9 +43,13 @@ JUDGES = {
 DB_STRING = f"{BASE_DIR.absolute() / 'submit_control.db'}"
 # DB_STRING = f"sqlite://submit_control.db"
 
-DELETE_RECORDS = False
-
 BUILD_NAMESPACE = 'kolejka'
 
 set_base_dir(PACKAGES_DIR)
 add_supported_extensions('cpp')
+
+BACA_URL = 'http://127.0.0.1:8000/broker_api'
+# Passwords for protecting communication channels between the broker and BaCa2.
+# PASSWORDS HAVE TO DIFFERENT IN ORDER TO BE EFFECTIVE
+BACA_PASSWORD = 'tmp-baca-password'
+BROKER_PASSWORD = 'tmp-broker-password'

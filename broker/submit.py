@@ -15,7 +15,7 @@ import yaml
 from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import *
 from .builder import Builder
-from settings import BUILD_NAMESPACE, KOLEJKA_CONF
+from settings import BUILD_NAMESPACE, KOLEJKA_CONF, BACA_PASSWORD, BACA_URL, APP_SETTINGS
 
 from typing import TYPE_CHECKING
 
@@ -23,15 +23,6 @@ from .yaml_tags import get_loader
 
 if TYPE_CHECKING:
     from .master import BrokerMaster
-
-# TODO: MOVE TO SOME OTHER SETTINGS FILE
-# {
-BACA_URL = ''
-# Passwords for protecting communication channels between the broker and BaCa2.
-# PASSWORDS HAVE TO DIFFERENT IN ORDER TO BE EFFECTIVE
-BACA_PASSWORD = 'tmp-baca-password'
-BROKER_PASSWORD = 'tmp-broker-password'
-# }
 
 
 def _translate_paths(*args):
@@ -66,11 +57,23 @@ class SubmitState(Enum):
     SAVING = 6
     #: Judging process ended successfully.
     DONE = 200
-    #: Submit results successfully sent to BaCa2
-    RETURNED = 201
+
+
+class CallbackStatus(Enum):
+    NOT_SENT = 0
+    SENT = 1
+    RECEIVED = 2
+    TIMEOUT = 3
+    ERROR = 4
 
 
 class TaskSubmit(Thread):
+    class BaCa2CommunicationError(Exception):
+        pass
+
+    class JudgingError(Exception):
+        pass
+
     TIMEOUT_STEP = 3
 
     def __init__(self,
@@ -105,6 +108,7 @@ class TaskSubmit(Thread):
             SubmitState.SAVING: 0,
             SubmitState.DONE: 0,
             SubmitState.ERROR: 0,
+            SubmitState.CANCELED: 0,
         }
         self._conn = master.connection
         self._conn.exec("INSERT INTO submit_records VALUES (?, ?, ?, ?, ?, ?, NULL, ?)",
@@ -121,6 +125,7 @@ class TaskSubmit(Thread):
             shutil.rmtree(self.task_submit_dir)
         self.task_submit_dir.mkdir()
         self.results = {}
+        self.active_wait = APP_SETTINGS['active_wait']
 
     def vprint(self, msg: str):
         if self.verbose:
@@ -129,9 +134,9 @@ class TaskSubmit(Thread):
     def _change_state(self, state: SubmitState, error_msg: str = None):
         self.state = state
         if state == SubmitState.DONE and self.master.delete_records:
-                self._conn.exec("DELETE FROM submit_records WHERE id = ?", self.submit_id, )
-            # TODO: Check if following exits thread.
-            # self.master.close_submit()
+            self._conn.exec("DELETE FROM submit_records WHERE id = ?", self.submit_id, )
+        # TODO: Check if following exits thread.
+        # self.master.close_submit()
         else:
             self._conn.exec("UPDATE submit_records SET state=?, error_msg=? WHERE id=?",
                             state, error_msg, self.submit_id)
@@ -155,16 +160,19 @@ class TaskSubmit(Thread):
         self._submit_update_lock.acquire()
         self.sets_statuses[status] += 1
         self._submit_update_lock.release()
-        if self.sets_statuses[status] == len(self.sets):
+        end_statuses = (self.sets_statuses[SubmitState.ERROR] +
+                        self.sets_statuses[SubmitState.DONE] +
+                        self.sets_statuses[SubmitState.CANCELED])
+        if self.sets_statuses[status] == len(self.sets) and status not in (SubmitState.DONE, SubmitState.SAVING):
             self._change_state(status)
+        elif end_statuses == len(self.sets):
+            ok_statuses = self.sets_statuses[SubmitState.DONE]
+            if ok_statuses != len(self.sets):
+                raise self.JudgingError(f'Some sets ended with an error ({ok_statuses}/{len(self.sets)} OK)')
 
     def close_set_submit(self, set_name: str, results: SetResult):
         with self._gather_results_lock:
             self.results[set_name] = results
-        if len(self.results) == len(self.sets):
-            self._change_state(SubmitState.DONE)
-            # TODO: verify
-            self._send_to_baca(BACA_URL, BACA_PASSWORD)
 
     def _call_for_update(self, success: bool, msg: str = None):
         pass
@@ -190,9 +198,15 @@ class TaskSubmit(Thread):
         # TODO: Consult package checking
         return True
 
+    def _check_results(self):
+        if self.state != SubmitState.SAVING:
+            raise self.JudgingError(f"Submit state has to be 'SAVING' not '{self.state.name}'.")
+        for s in self.sets:
+            if s.state != SubmitState.DONE:
+                raise self.JudgingError(f"SetSubmit state has to be 'DONE' not '{s.state.name}'.")
+        return True
+
     def _send_to_baca(self, baca_url: str, password: str) -> None:
-        if self.state != SubmitState.DONE:
-            raise ValueError(f"Submit state has to be 'DONE' not '{repr(self.state)}'.")
         message = BrokerToBaca(
             pass_hash=make_hash(password, self.submit_id),
             submit_id=self.submit_id,
@@ -200,8 +214,7 @@ class TaskSubmit(Thread):
         )
         r = requests.post(url=f'{baca_url}/result/{self.submit_id}', json=message.serialize())
         if r.status_code != 200:
-            raise ConnectionError(f"Results for TaskSubmit with id {self.submit_id} could not be send.")
-        self._change_state(SubmitState.RETURNED)
+            raise self.BaCa2CommunicationError(f"Results for TaskSubmit with id {self.submit_id} could not be send.")
 
     def process(self):
         self._change_state(SubmitState.AWAITING_PREPROC)
@@ -216,16 +229,25 @@ class TaskSubmit(Thread):
             self._change_state(SubmitState.CANCELED)
             self._call_for_update(success=False, msg='Package check error')
             return
-
         self._change_state(SubmitState.SENDING)
         for s in self.sets:
             s.start()
+
+        for s in self.sets:
+            s.join()
+
+        self._change_state(SubmitState.SAVING)
+        self._check_results()
+        self._send_to_baca(BACA_URL, BACA_PASSWORD)
+
+        self._change_state(SubmitState.DONE)
 
     def run(self):
         try:
             self.process()
         except Exception as e:
-            self._change_state(SubmitState.ERROR, str(e))
+            self._change_state(SubmitState.ERROR, f'{e.__class__.__name__}: {e} \n\n '
+                                                  f'{e.__traceback__.tb_lineno} {e.__traceback__.tb_lasti}')
 
 
 class SetSubmit(Thread):
@@ -249,21 +271,24 @@ class SetSubmit(Thread):
         self.package = package
         self.set_name = set_name
         self.callback_url = None
+        self.set_submit_id = f'{self.submit_id}_{self.set_name}'
 
         self.submit_path = submit_path
         self._conn = master.connection
-        self.submit_http_server = master.submit_http_server
+        self.kolejka_manager = master.kolejka_manager
 
         self._conn.exec("INSERT INTO set_submit_records VALUES (NULL, ?, ?, NULL, ?)",
                         self.submit_id, self.set_name, self.state)
         self.task_dir = self.task_submit.task_submit_dir / f'{self.set_name}.task'
         self.result_dir = self.task_submit.task_submit_dir / f'{self.set_name}.result'
+        self.results = None
 
         if sys.platform.startswith('win'):
             self.python_call = 'py'
         else:
             self.python_call = 'python3'
 
+        self.callback_status = CallbackStatus.NOT_SENT
         # self._call_for_update()
 
     def vprint(self, msg: str):
@@ -273,14 +298,11 @@ class SetSubmit(Thread):
         self.task_submit.set_submit_update(self.state)
 
     def _change_state(self, state: SubmitState, error_msg: str = None):
-        # TODO: Add state monitoring for parent (task) submit
         self.state = state
         if state == SubmitState.DONE and self.master.delete_records:
             self._conn.exec("DELETE FROM set_submit_records WHERE submit_id=? AND set_name=?",
                             self.submit_id, self.set_name)
             # TODO: Check if following exits thread.
-        elif state == SubmitState.DONE or state == SubmitState.ERROR:
-            self.task_submit.close_set_submit(self.set_name)
         else:
             self._conn.exec("UPDATE set_submit_records SET state=?, error_msg=? WHERE submit_id=? AND set_name=?",
                             state, error_msg, self.submit_id, self.set_name)
@@ -289,8 +311,12 @@ class SetSubmit(Thread):
         self._call_for_update()
 
     def _send_submit(self):
-        self.callback_url = self.submit_http_server.add_submit(f'{self.submit_id}_{self.set_name}')
-        # TODO: adding submit should return url
+        set_id = f'{self.submit_id}_{self.set_name}'
+        if not self.task_submit.active_wait:
+            self.kolejka_manager.add_submit(set_id)
+            self.callback_url = self.master.broker_server.get_kolejka_callback_url(set_id)
+        else:
+            self.callback_url = 'localhost'
 
         cmd_judge = [self.python_call, self.task_submit.kolejka_judge,
                      'task',
@@ -319,11 +345,9 @@ class SetSubmit(Thread):
 
         if client_status.returncode != 0:
             raise self.KOLEJKACommunicationFailed('KOLEJKA client failed to communicate with KOLEJKA server.')
+        self.callback_status = CallbackStatus.SENT
 
-    def _await_results(self, timeout: float = -1, active_wait:bool = False) -> bool:
-        if not active_wait:
-            self.submit_http_server.await_submit(self.set_submit_url, timeout)
-
+    def results_get(self) -> bool:
         result_get = [self.python_call,
                       self.task_submit.kolejka_client,
                       '--config-file', KOLEJKA_CONF,
@@ -335,26 +359,54 @@ class SetSubmit(Thread):
 
         result_status = subprocess.run(result_get, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        if not active_wait:
-            if result_status.returncode != 0:
-                raise self.KOLEJKACommunicationFailed('KOLEJKA client failed to communicate with KOLEJKA server.')
+        if result_status.returncode == 0:
+            return True
         else:
-            time_track = 0
-            while result_status.returncode != 0:
-                sleep(self.task_submit.TIMEOUT_STEP)
-                time_track += self.task_submit.TIMEOUT_STEP
-                result_status = subprocess.run(result_get, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                if 0 < timeout < time_track:
-                    raise self.KOLEJKACommunicationFailed('Reached timeout while waiting for KOLEJKA response.')
+            return False
+
+    def success_ping(self, success: bool) -> None:
+        if success:
+            self.callback_status = CallbackStatus.RECEIVED
+        else:
+            self.callback_status = CallbackStatus.TIMEOUT
+
+    def _await_results(self) -> bool:
+        from settings import APP_SETTINGS
+
+        await_results_lock = Lock()
+        if self.task_submit.active_wait:
+            self.master.timeout_manager.add_active_wait(self.set_submit_id,
+                                                        await_results_lock,
+                                                        wait_action=self.results_get,
+                                                        success_ping=self.success_ping, )
+            await_results_lock.acquire()
+            self.master.timeout_manager.remove_timeout(self.set_submit_id)
+        else:
+            self.success_ping(self.master.kolejka_manager.await_submit(
+                self.set_submit_id,
+                timeout=APP_SETTINGS['default_timeout'].total_seconds())
+            )
+
+            results_received = False
+            if self.callback_status == CallbackStatus.TIMEOUT:
+                results_received = self.results_get()
+            if results_received:
+                self.success_ping(True)
+
+        if self.callback_status == CallbackStatus.TIMEOUT:
+            raise self.KOLEJKACommunicationFailed('KOLEJKA callback timeout')
+        elif self.callback_status == CallbackStatus.ERROR:
+            raise self.KOLEJKACommunicationFailed('KOLEJKA callback error')
+        elif self.callback_status != CallbackStatus.RECEIVED:
+            raise self.KOLEJKACommunicationFailed('KOLEJKA callback unknown error')
 
         return True
 
     def _parse_results(self) -> SetResult:
-        # TODO: test code
         # TODO: add assertion about status
         results_yaml = self.result_dir / 'results' / 'results.yaml'
         with open(results_yaml) as f:
-            content: dict = yaml.load(f, get_loader())
+            content: dict = yaml.load(f, Loader=get_loader())
         tests = {}
         for key, val in content.items():
             satori = val['satori']
@@ -366,26 +418,25 @@ class SetSubmit(Thread):
                 runtime_memory=int(satori['execute_memory'][:-1])
             )
             tests[key] = tmp
-        return SetResult(name=self.name, tests=tests)
+        return SetResult(name=self.set_name, tests=tests)
 
     def process(self):
         self._change_state(SubmitState.SENDING)
         self._send_submit()
 
         self._change_state(SubmitState.AWAITING_JUDGE)
-        # TODO: consider adding timeout for safety (otherwise if something goes wrong the method may never return)
-        self._await_results(timeout=60, active_wait=True)
+        self._await_results()
 
         self._change_state(SubmitState.SAVING)
-        results = self._parse_results()
+        self.results = self._parse_results()
+
+        self.task_submit.close_set_submit(self.set_name, self.results)
 
         self._change_state(SubmitState.DONE)
-        self.task_submit.close_set_submit(self.set_name, results)
-
 
     def run(self):
         try:
             self.process()
         except Exception as e:
-            self._change_state(SubmitState.ERROR, str(e))
+            self._change_state(SubmitState.ERROR, f'{e.__class__.__name__}: {e}')
             # TODO: error handling for BaCa2 srv
