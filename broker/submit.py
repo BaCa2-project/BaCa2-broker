@@ -242,7 +242,14 @@ class TaskSubmit(Thread):
 
         self._change_state(SubmitState.DONE)
 
+    def _submit_in_db(self) -> bool:
+        # SQL injection is quite likely here
+        tmp = self._conn.select(f"SELECT * FROM submit_records WHERE id='{self.submit_id}'", 'one')  # BRUH
+        return tmp is not None
+
     def run(self):
+        if self._submit_in_db():
+            return
         try:
             self.process()
         except Exception as e:

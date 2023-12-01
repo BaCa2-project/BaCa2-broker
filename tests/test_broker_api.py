@@ -1,14 +1,18 @@
-import sqlite3
-import unittest as ut
-import os
-from pathlib import Path
-from threading import Thread
-from http.server import BaseHTTPRequestHandler, HTTPServer
-import json
 import cgi
-from dataclasses import asdict
+import json
+import os
+import unittest as ut
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from threading import Thread, Lock
+from time import sleep
 
-import requests
+from baca2PackageManager import *
+
+from broker.master import BrokerMaster
+from settings import BASE_DIR
+
+set_base_dir(BASE_DIR / 'tests' / 'test_packages')
+add_supported_extensions('cpp')
 
 
 class DummyBacaServer(BaseHTTPRequestHandler):
@@ -41,18 +45,29 @@ class DummyBacaServer(BaseHTTPRequestHandler):
 
         # send the message back
         self._set_headers()
-        print(message)
+#       print(message)
 
 
-def server_run(server_class=HTTPServer, handler_class=DummyBacaServer, port=8008):
+def server_run(server_class=HTTPServer, handler_class=DummyBacaServer, port=8180):
     server_address = ('', port)
     httpd = server_class(server_address, handler_class)
 
-    print('Starting httpd on port %d...' % port)
+#   print('Starting httpd on port %d...' % port)
     th = Thread(target=httpd.serve_forever)
     th.start()
     return httpd, th
 
 
 class BasicTests(ut.TestCase):
-    ...
+    test_dir = Path(__file__).absolute().parent
+
+    def setUp(self) -> None:
+        self.master = BrokerMaster(self.test_dir / 'test.db', BASE_DIR / 'tests' / 'test_packages', delete_records=True)
+        os.system('sqlite3 {} <{}'.format(self.test_dir / 'test.db', self.test_dir.parent / 'db' / 'creator.sql'))
+
+    def tearDown(self) -> None:
+        os.remove(self.test_dir / 'test.db')
+
+    def test_cycle(self):
+        self.master.new_submit('1', self.test_dir / 'test_packages' / '1', '1', self.test_dir)
+
