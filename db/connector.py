@@ -40,8 +40,8 @@ class Connection:
         self._connection.close()
         self.execution_lock.release()
 
-    def select(self, stmt: str, mode: str):
-        res = self._cursor.execute(stmt)
+    def select(self, stmt: str, mode: str, *args):
+        res = self._cursor.execute(stmt, self._translate_args(args))
         if mode == "one":
             res = res.fetchone()
         elif mode == "all":
