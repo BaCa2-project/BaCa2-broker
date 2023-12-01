@@ -35,10 +35,12 @@ class BrokerMaster:
             for key, value in APP_SETTINGS.items():
                 print(f'\t{key}: {value}')
 
-    def __del__(self):
+#   def __del__(self):
+#       self.stop()
+
+    def stop(self):
         self.broker_server.close_server()
         self.timeout_manager.stop()
-
 
     @staticmethod
     def refresh_kolejka_src(add_executable_attr: bool = True):
@@ -69,13 +71,16 @@ class BrokerMaster:
                    package_path: Path,
                    commit_id: str,
                    submit_path: Path):
-        submit = TaskSubmit(self,
-                            submit_id,
-                            package_path,
-                            commit_id,
-                            submit_path,
-                            force_rebuild=APP_SETTINGS['force_rebuild'],
-                            verbose=APP_SETTINGS['verbose'])
+        try:
+            submit = TaskSubmit(self,
+                                submit_id,
+                                package_path,
+                                commit_id,
+                                submit_path,
+                                force_rebuild=APP_SETTINGS['force_rebuild'],
+                                verbose=APP_SETTINGS['verbose'])
+        except TaskSubmit.JudgingError:
+            return
         self.submits[submit_id] = submit
         submit.start()
 

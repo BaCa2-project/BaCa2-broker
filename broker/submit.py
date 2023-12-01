@@ -111,6 +111,8 @@ class TaskSubmit(Thread):
             SubmitState.CANCELED: 0,
         }
         self._conn = master.connection
+        if self._submit_in_db():
+            raise self.JudgingError(f'Submit with id {self.submit_id} already exists in db.')
         self._conn.exec("INSERT INTO submit_records VALUES (?, ?, ?, ?, ?, ?, NULL, ?)",
                         self.submit_id,  # id
                         datetime.now(),  # launch_datetime
@@ -126,6 +128,10 @@ class TaskSubmit(Thread):
         self.task_submit_dir.mkdir()
         self.results = {}
         self.active_wait = APP_SETTINGS['active_wait']
+
+    @property
+    def status(self) -> SubmitState:
+        return self.state
 
     def vprint(self, msg: str):
         if self.verbose:
@@ -243,13 +249,10 @@ class TaskSubmit(Thread):
         self._change_state(SubmitState.DONE)
 
     def _submit_in_db(self) -> bool:
-        # SQL injection is quite likely here
-        tmp = self._conn.select(f"SELECT * FROM submit_records WHERE id='{self.submit_id}'", 'one')  # BRUH
+        tmp = self._conn.select(f"SELECT * FROM submit_records WHERE id=?", 'one', self.submit_id)
         return tmp is not None
 
     def run(self):
-        if self._submit_in_db():
-            return
         try:
             self.process()
         except Exception as e:

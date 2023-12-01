@@ -1,18 +1,22 @@
 import cgi
 import json
 import os
+import shutil
 import unittest as ut
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from threading import Thread, Lock
-from time import sleep
+from threading import Thread
 
 from baca2PackageManager import *
 
+from broker.submit import SubmitState
 from broker.master import BrokerMaster
 from settings import BASE_DIR
 
 set_base_dir(BASE_DIR / 'tests' / 'test_packages')
 add_supported_extensions('cpp')
+
+
+KOLEJKA_CONFIGURED = False
 
 
 class DummyBacaServer(BaseHTTPRequestHandler):
@@ -62,12 +66,29 @@ class BasicTests(ut.TestCase):
     test_dir = Path(__file__).absolute().parent
 
     def setUp(self) -> None:
-        self.master = BrokerMaster(self.test_dir / 'test.db', BASE_DIR / 'tests' / 'test_packages', delete_records=True)
+        try:
+            os.remove(self.test_dir / 'test.db')
+        except Exception:  pass
+        try:
+            shutil.rmtree(self.test_dir / 'tmp_built')
+        except Exception:  pass
+        os.mkdir(self.test_dir / 'tmp_built')
+        self.master = BrokerMaster(self.test_dir / 'test.db', self.test_dir / 'tmp_built', delete_records=True)
         os.system('sqlite3 {} <{}'.format(self.test_dir / 'test.db', self.test_dir.parent / 'db' / 'creator.sql'))
 
     def tearDown(self) -> None:
+        self.master.stop()
         os.remove(self.test_dir / 'test.db')
+        shutil.rmtree(self.test_dir / 'tmp_built')
 
     def test_cycle(self):
-        self.master.new_submit('1', self.test_dir / 'test_packages' / '1', '1', self.test_dir)
-
+        self.master.new_submit('1',
+                               self.test_dir / 'test_packages' / '1',
+                               '1',
+                               submit_path=self.test_dir / 'test_packages' / '1' / '1' / 'prog' / 'solution.cpp')
+        submit = self.master.submits['1']
+        submit.join()
+        if KOLEJKA_CONFIGURED:
+            self.assertEqual(SubmitState.DONE, submit.status)
+        else:
+            self.assertEqual(SubmitState.ERROR, submit.status)
