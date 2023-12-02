@@ -96,6 +96,7 @@ class BasicTests(ut.TestCase):
             self.test_dir / 'test.db',
             self.test_dir / 'tmp_built',
             delete_records=False)
+        self.master.start()
         self.master.set_submit_type(DummySubmit)
         os.system('sqlite3 {} <{}'.format(self.test_dir / 'test.db', self.test_dir.parent / 'db' / 'creator.sql'))
 
