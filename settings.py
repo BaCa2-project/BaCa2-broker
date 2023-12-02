@@ -53,3 +53,7 @@ BACA_URL = 'http://127.0.0.1:8000/broker_api'
 # PASSWORDS HAVE TO DIFFERENT IN ORDER TO BE EFFECTIVE
 BACA_PASSWORD = 'tmp-baca-password'
 BROKER_PASSWORD = 'tmp-broker-password'
+# Number of tries to send a submit results back to BaCa2
+BACA_SEND_TRIES = 1
+# Interval between tries to send a submit results back to BaCa2
+BACA_SEND_INTERVAL = 0.4

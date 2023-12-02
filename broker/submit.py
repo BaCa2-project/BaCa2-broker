@@ -15,7 +15,8 @@ import yaml
 from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import *
 from .builder import Builder
-from settings import BUILD_NAMESPACE, KOLEJKA_CONF, BACA_PASSWORD, BACA_URL, APP_SETTINGS
+from settings import (BUILD_NAMESPACE, KOLEJKA_CONF, BACA_PASSWORD, BACA_URL,
+                      APP_SETTINGS, BACA_SEND_TRIES, BACA_SEND_INTERVAL)
 
 from typing import TYPE_CHECKING
 
@@ -212,15 +213,21 @@ class TaskSubmit(Thread):
                 raise self.JudgingError(f"SetSubmit state has to be 'DONE' not '{s.state.name}'.")
         return True
 
-    def _send_to_baca(self, baca_url: str, password: str) -> None:
+    def _send_to_baca(self, baca_url: str, password: str) -> bool:
         message = BrokerToBaca(
             pass_hash=make_hash(password, self.submit_id),
             submit_id=self.submit_id,
-            results=deepcopy(self.results)  # TODO: verify if deepcopy is appropriate here
+            results=deepcopy(self.results)
         )
-        r = requests.post(url=f'{baca_url}/result/{self.submit_id}', json=message.serialize())
-        if r.status_code != 200:
-            raise self.BaCa2CommunicationError(f"Results for TaskSubmit with id {self.submit_id} could not be send.")
+        s = requests.Session()
+        try:
+            r = s.post(url=f'{baca_url}/result/{self.submit_id}', json=message.serialize())
+        except (requests.exceptions.RequestException, requests.exceptions.ChunkedEncodingError):
+            return False
+        else:
+            return r.status_code == 200
+        finally:
+            s.close()
 
     def process(self):
         self._change_state(SubmitState.AWAITING_PREPROC)
@@ -244,6 +251,12 @@ class TaskSubmit(Thread):
 
         self._change_state(SubmitState.SAVING)
         self._check_results()
+        for i in range(BACA_SEND_TRIES):
+            if self._send_to_baca(BACA_URL, BACA_PASSWORD):
+                break
+            sleep(BACA_SEND_INTERVAL)
+        else:
+            raise self.BaCa2CommunicationError(f"Results for TaskSubmit with id {self.submit_id} could not be send.")
         self._send_to_baca(BACA_URL, BACA_PASSWORD)
 
         self._change_state(SubmitState.DONE)

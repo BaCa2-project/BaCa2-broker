@@ -86,14 +86,10 @@ class BasicTests(ut.TestCase):
     test_dir = Path(__file__).absolute().parent
 
     def setUp(self) -> None:
-        try:
+        if os.path.exists(self.test_dir / 'test.db'):
             os.remove(self.test_dir / 'test.db')
-        except Exception:
-            pass
-        try:
+        if os.path.exists(self.test_dir / 'tmp_built'):
             shutil.rmtree(self.test_dir / 'tmp_built')
-        except Exception:
-            pass
         self.server, self.s_thread = DummyBacaServer.server_run()
         os.mkdir(self.test_dir / 'tmp_built')
         self.master = DummyMaster(
@@ -121,19 +117,19 @@ class BasicTests(ut.TestCase):
         self.assertEqual(SubmitState.DONE, submit.status)
 
     def test_many_submits(self):
-        NUM = 10
+        NUM = 100
         for i in range(NUM):
             self.master.new_submit(str(i),
                                    self.test_dir / 'test_packages' / '1',
                                    '1',
                                    submit_path=self.test_dir / 'test_packages' / '1' / '1' / 'prog' / 'solution.cpp')
-            sleep(0.1)
+            sleep(0.01)
         done = 0
         for i in range(NUM):
             submit = self.master.submits[str(i)]
             submit.join()
             done += 1 if submit.status == SubmitState.DONE else 0
-        self.assertTrue(done >= 0.95 * NUM)
+        self.assertTrue(done >= 1.00 * NUM)
 
     def test_many_same_submits(self):
         class DummySubmit2(TaskSubmit):
