@@ -23,6 +23,17 @@ class DummySubmit(TaskSubmit):
         self._change_state(SubmitState.DONE)
 
 
+class DummyErrorSubmit(TaskSubmit):
+
+    def process(self):
+        self._send_error_to_baca("http://127.0.0.1:9000", BACA_PASSWORD, "Error")
+        self._change_state(SubmitState.ERROR)
+
+    def _send_error_to_baca(self, baca_url: str, password: str, error_msg: str) -> bool:
+        tmp = super()._send_error_to_baca(baca_url, password, error_msg)
+        assert tmp is True
+
+
 class DummyMaster(BrokerMaster):
 
     def __init__(self, *args, **kwargs):
@@ -149,3 +160,15 @@ class BasicTests(ut.TestCase):
             sleep(0.01)
         tmp = self.master.connection.select('SELECT * FROM submit_records WHERE id = ?', 'all', '1')
         self.assertEqual(1, len(tmp))
+
+    def test_error_submit(self):
+
+        self.master.set_submit_type(DummyErrorSubmit)
+
+        self.master.new_submit('1',
+                               self.test_dir / 'test_packages' / '1',
+                               '1',
+                               submit_path=self.test_dir / 'test_packages' / '1' / '1' / 'prog' / 'solution.cpp')
+        submit = self.master.submits['1']
+        submit.join()
+        self.assertEqual(SubmitState.ERROR, submit.status)

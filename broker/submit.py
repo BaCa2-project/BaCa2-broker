@@ -15,7 +15,7 @@ import yaml
 from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import *
 from .builder import Builder
-from settings import (BUILD_NAMESPACE, KOLEJKA_CONF, BACA_PASSWORD, BACA_URL,
+from settings import (BUILD_NAMESPACE, KOLEJKA_CONF, BACA_PASSWORD, BACA_RESULTS_URL, BACA_ERROR_URL,
                       APP_SETTINGS, BACA_SEND_TRIES, BACA_SEND_INTERVAL)
 
 from typing import TYPE_CHECKING
@@ -221,7 +221,23 @@ class TaskSubmit(Thread):
         )
         s = requests.Session()
         try:
-            r = s.post(url=f'{baca_url}/result/{self.submit_id}', json=message.serialize())
+            r = s.post(url=baca_url, json=message.serialize())
+        except (requests.exceptions.RequestException, requests.exceptions.ChunkedEncodingError):
+            return False
+        else:
+            return r.status_code == 200
+        finally:
+            s.close()
+
+    def _send_error_to_baca(self, baca_url: str, password: str, error_msg: str) -> bool:
+        message = BrokerToBacaError(
+            pass_hash=make_hash(password, self.submit_id),
+            submit_id=self.submit_id,
+            error=error_msg
+        )
+        s = requests.Session()
+        try:
+            r = s.post(url=baca_url, json=message.serialize())
         except (requests.exceptions.RequestException, requests.exceptions.ChunkedEncodingError):
             return False
         else:
@@ -252,12 +268,11 @@ class TaskSubmit(Thread):
         self._change_state(SubmitState.SAVING)
         self._check_results()
         for i in range(BACA_SEND_TRIES):
-            if self._send_to_baca(BACA_URL, BACA_PASSWORD):
+            if self._send_to_baca(BACA_RESULTS_URL, BACA_PASSWORD):
                 break
             sleep(BACA_SEND_INTERVAL)
         else:
             raise self.BaCa2CommunicationError(f"Results for TaskSubmit with id {self.submit_id} could not be send.")
-        self._send_to_baca(BACA_URL, BACA_PASSWORD)
 
         self._change_state(SubmitState.DONE)
 
@@ -268,7 +283,10 @@ class TaskSubmit(Thread):
     def run(self):
         try:
             self.process()
+        except self.BaCa2CommunicationError as e:
+            self._change_state(SubmitState.ERROR, f'{e.__class__.__name__}: {e}')
         except Exception as e:
+            self._send_error_to_baca(BACA_ERROR_URL, BACA_PASSWORD, str(e))
             self._change_state(SubmitState.ERROR, f'{e.__class__.__name__}: {e} \n\n '
                                                   f'{e.__traceback__.tb_lineno} {e.__traceback__.tb_lasti}')
 

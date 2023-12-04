@@ -48,7 +48,8 @@ BUILD_NAMESPACE = 'kolejka'
 set_base_dir(PACKAGES_DIR)
 add_supported_extensions('cpp')
 
-BACA_URL = 'http://127.0.0.1:8000/broker_api'
+BACA_RESULTS_URL = 'http://127.0.0.1:8000/broker_api/results'
+BACA_ERROR_URL = 'http://127.0.0.1:8000/broker_api/error'
 # Passwords for protecting communication channels between the broker and BaCa2.
 # PASSWORDS HAVE TO DIFFERENT IN ORDER TO BE EFFECTIVE
 BACA_PASSWORD = 'tmp-baca-password'
