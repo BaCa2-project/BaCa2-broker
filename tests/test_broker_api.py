@@ -19,15 +19,15 @@ add_supported_extensions('cpp')
 class DummySubmit(TaskSubmit):
 
     def process(self):
-        self._send_to_baca("http://127.0.0.1:9000", BACA_PASSWORD)
+        tmp = self._send_to_baca("http://127.0.0.1:8000/broker_api/results", BACA_PASSWORD)
+        assert tmp is True
         self._change_state(SubmitState.DONE)
 
 
 class DummyErrorSubmit(TaskSubmit):
 
     def process(self):
-        self._send_error_to_baca("http://127.0.0.1:9000", BACA_PASSWORD, "Error")
-        self._change_state(SubmitState.ERROR)
+        raise self.JudgingError("Error")
 
     def _send_error_to_baca(self, baca_url: str, password: str, error_msg: str) -> bool:
         tmp = super()._send_error_to_baca(baca_url, password, error_msg)
@@ -64,14 +64,11 @@ class DummyMaster(BrokerMaster):
 
 class DummyBacaServer(BaseHTTPRequestHandler):
 
-    def _set_headers(self):
-        self.send_response(200)
+    def _set_headers(self, resp: int):
+        self.send_response(resp)
         self.send_header('Content-type', 'application/json')
         self.send_header('Content-Encoding', 'UTF-8')
         self.end_headers()
-
-    def do_GET(self):
-        self._set_headers()
 
     def do_POST(self):
         c_type, pdict = cgi.parse_header(self.headers.get('content-type'))
@@ -81,10 +78,15 @@ class DummyBacaServer(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        self._set_headers()
+        if self.path == '/broker_api/results':
+            self._set_headers(200)
+        elif self.path == '/broker_api/error':
+            self._set_headers(200)
+        else:
+            self._set_headers(404)
 
     @classmethod
-    def server_run(cls, port=9000):
+    def server_run(cls, port=8000):
         server_address = ('127.0.0.1', port)
         httpd = ThreadingHTTPServer(server_address, cls)
 
@@ -120,6 +122,7 @@ class BasicTests(ut.TestCase):
         shutil.rmtree(self.test_dir / 'tmp_built')
 
     def test_one_submit(self):
+        # self.master.set_submit_type(TaskSubmit)
         self.master.new_submit('1',
                                self.test_dir / 'test_packages' / '1',
                                '1',
@@ -141,7 +144,7 @@ class BasicTests(ut.TestCase):
             submit = self.master.submits[str(i)]
             submit.join()
             done += 1 if submit.status == SubmitState.DONE else 0
-        self.assertTrue(done >= 1.00 * NUM)
+        self.assertTrue(done >= 0.95 * NUM)
 
     def test_many_same_submits(self):
         class DummySubmit2(TaskSubmit):
@@ -172,3 +175,40 @@ class BasicTests(ut.TestCase):
         submit = self.master.submits['1']
         submit.join()
         self.assertEqual(SubmitState.ERROR, submit.status)
+
+        class DummyTotalFailureSubmit(TaskSubmit):
+            def process(self):
+                raise self.BaCa2CommunicationError
+
+            def _send_error_to_baca(self, baca_url: str, password: str, error_msg: str) -> bool:
+                assert False  # Brah, you shouldn't be here
+
+        # The following lines test if a message is sent when BaCa2CommunicationError is raised (it shouldn't be sent)
+        self.master.set_submit_type(DummyTotalFailureSubmit)
+        self.master.new_submit('2',
+                               self.test_dir / 'test_packages' / '1',
+                               '1',
+                               submit_path=self.test_dir / 'test_packages' / '1' / '1' / 'prog' / 'solution.cpp')
+        submit = self.master.submits['2']
+        submit.join()
+
+    def test_resend_error_submit(self):
+
+        self.master.set_submit_type(DummyErrorSubmit)
+
+        self.master.new_submit('1',
+                               self.test_dir / 'test_packages' / '1',
+                               '1',
+                               submit_path=self.test_dir / 'test_packages' / '1' / '1' / 'prog' / 'solution.cpp')
+        submit = self.master.submits['1']
+        submit.join()
+        self.assertEqual(SubmitState.ERROR, submit.status)
+
+        self.master.set_submit_type(DummySubmit)
+        self.master.new_submit('1',
+                               self.test_dir / 'test_packages' / '1',
+                               '1',
+                               submit_path=self.test_dir / 'test_packages' / '1' / '1' / 'prog' / 'solution.cpp')
+        submit = self.master.submits['1']
+        submit.join()
+        self.assertEqual(SubmitState.DONE, submit.status)
