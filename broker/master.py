@@ -64,11 +64,10 @@ class BrokerMaster:
         if not self._is_active:
             self.start()
 
-        finished = False
-        while not finished:
-            inp = input("Enter 'STOP' to stop the broker: ")
+        while True:
+            inp = input("Enter 'STOP' to stop the broker.\n")
             if inp == 'STOP':
-                finished = True
+                break
 
         self.stop()
 
