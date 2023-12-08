@@ -1,7 +1,10 @@
 # Settings for broker
+import os
 from pathlib import Path
-from baca2PackageManager import set_base_dir, add_supported_extensions
 from datetime import timedelta
+from dotenv import load_dotenv
+
+from baca2PackageManager import set_base_dir, add_supported_extensions
 
 MODES = {
     'production': {
@@ -25,15 +28,28 @@ MODES = {
         'server_port': 8180,
     }
 }
-APP_MODE = 'development'
+APP_MODE = os.getenv('APP_MODE', 'development')
 APP_SETTINGS = MODES[APP_MODE]
 
 BASE_DIR = Path(__file__).resolve().parent
-BACA2_DIR = BASE_DIR.parent.parent / 'BaCa2'  # Change if you have a different path
-PACKAGES_DIR = BACA2_DIR / 'packages_source'
+_baca2_dir_in = os.getenv('BACA2_DIR')
+if _baca2_dir_in is not None:
+    BACA2_DIR = Path(_baca2_dir_in)
+else:
+    BACA2_DIR = BASE_DIR.parent.parent / 'BaCa2'  # Change if you have a different path
+_packages_dir_in = os.getenv('PACKAGES_DIR')
+if _packages_dir_in is not None:
+    PACKAGES_DIR = Path(_packages_dir_in)
+else:
+    PACKAGES_DIR = BACA2_DIR / 'packages_source'
+_submits_dir_in = os.getenv('SUBMITS_DIR')
+if _submits_dir_in is not None:
+    SUBMITS_DIR = Path(_submits_dir_in)
+else:
+    SUBMITS_DIR = BASE_DIR / 'submits'
+
 KOLEJKA_SRC_DIR = BASE_DIR / 'kolejka_src'
 JUDGES_SRC_DIR = BASE_DIR / 'judges'
-SUBMITS_DIR = BASE_DIR / 'submits'
 KOLEJKA_CONF = BASE_DIR / 'kolejka.conf'
 
 JUDGES = {
@@ -48,8 +64,11 @@ BUILD_NAMESPACE = 'kolejka'
 set_base_dir(PACKAGES_DIR)
 add_supported_extensions('cpp')
 
-BACA_URL = 'http://127.0.0.1:8000/broker_api'
+BACA_URL = os.getenv('BACA_URL')
 # Passwords for protecting communication channels between the broker and BaCa2.
 # PASSWORDS HAVE TO DIFFERENT IN ORDER TO BE EFFECTIVE
-BACA_PASSWORD = 'tmp-baca-password'
-BROKER_PASSWORD = 'tmp-broker-password'
+BACA_PASSWORD = os.getenv('BACA_PASSWORD')
+BROKER_PASSWORD = os.getenv('BROKER_PASSWORD')
+
+DB_USER = os.getenv('DB_USER')
+DB_PASSWORD = os.getenv('DB_PASSWORD')
