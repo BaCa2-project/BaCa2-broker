@@ -54,7 +54,7 @@ BACA_SEND_TRIES = 1
 BACA_SEND_INTERVAL = 0.4
 
 # Where results should be sent back to BaCa2
-BACA_RESULTS_URL = 'http://127.0.0.1:8000/broker_api/results'
+BACA_RESULTS_URL = 'http://127.0.0.1:8000/broker_api/result'
 # Where error notifications should be sent to BaCa2
 BACA_ERROR_URL = 'http://127.0.0.1:8000/broker_api/error'
 

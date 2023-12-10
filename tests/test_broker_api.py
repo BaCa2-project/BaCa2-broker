@@ -19,7 +19,7 @@ add_supported_extensions('cpp')
 class DummySubmit(TaskSubmit):
 
     def process(self):
-        tmp = self._send_to_baca("http://127.0.0.1:8000/broker_api/results", BACA_PASSWORD)
+        tmp = self._send_to_baca("http://127.0.0.1:8000/broker_api/result", BACA_PASSWORD)
         assert tmp is True
         self._change_state(SubmitState.DONE)
 
@@ -78,7 +78,7 @@ class DummyBacaServer(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        if self.path == '/broker_api/results':
+        if self.path == '/broker_api/result':
             self._set_headers(200)
         elif self.path == '/broker_api/error':
             self._set_headers(200)
