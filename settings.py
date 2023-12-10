@@ -48,8 +48,6 @@ BUILD_NAMESPACE = 'kolejka'
 set_base_dir(PACKAGES_DIR)
 add_supported_extensions('cpp')
 
-# Set to True if you want to delete previous ERROR record from the database upon receiving a new submit
-DELETE_ERROR_SUBMITS = True
 # Number of tries to send a submit results back to BaCa2
 BACA_SEND_TRIES = 1
 # Interval between tries to send a submit results back to BaCa2

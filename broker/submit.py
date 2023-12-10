@@ -16,7 +16,7 @@ from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import *
 from .builder import Builder
 from settings import (BUILD_NAMESPACE, KOLEJKA_CONF, BACA_PASSWORD, BACA_RESULTS_URL, BACA_ERROR_URL,
-                      APP_SETTINGS, BACA_SEND_TRIES, BACA_SEND_INTERVAL, DELETE_ERROR_SUBMITS)
+                      APP_SETTINGS, BACA_SEND_TRIES, BACA_SEND_INTERVAL)
 
 from typing import TYPE_CHECKING
 
@@ -277,17 +277,8 @@ class TaskSubmit(Thread):
         self._change_state(SubmitState.DONE)
 
     def _submit_in_db(self) -> bool:
-        tmp = self._conn.select(
-            f"SELECT * FROM submit_records WHERE id=?", 'one', self.submit_id)
-        if (
-                DELETE_ERROR_SUBMITS
-                and tmp is not None
-                and self.master.submits[self.submit_id].status == SubmitState.ERROR
-        ):
-            self._conn.exec("DELETE FROM submit_records WHERE id=?", self.submit_id)
-            return False
-        else:
-            return tmp is not None
+        tmp = self._conn.select("SELECT * FROM submit_records WHERE id=?", 'one', self.submit_id)
+        return tmp is not None
 
     def run(self):
         try:

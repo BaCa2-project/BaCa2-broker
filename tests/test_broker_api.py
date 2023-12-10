@@ -191,24 +191,3 @@ class BasicTests(ut.TestCase):
                                submit_path=self.test_dir / 'test_packages' / '1' / '1' / 'prog' / 'solution.cpp')
         submit = self.master.submits['2']
         submit.join()
-
-    def test_resend_error_submit(self):
-
-        self.master.set_submit_type(DummyErrorSubmit)
-
-        self.master.new_submit('1',
-                               self.test_dir / 'test_packages' / '1',
-                               '1',
-                               submit_path=self.test_dir / 'test_packages' / '1' / '1' / 'prog' / 'solution.cpp')
-        submit = self.master.submits['1']
-        submit.join()
-        self.assertEqual(SubmitState.ERROR, submit.status)
-
-        self.master.set_submit_type(DummySubmit)
-        self.master.new_submit('1',
-                               self.test_dir / 'test_packages' / '1',
-                               '1',
-                               submit_path=self.test_dir / 'test_packages' / '1' / '1' / 'prog' / 'solution.cpp')
-        submit = self.master.submits['1']
-        submit.join()
-        self.assertEqual(SubmitState.DONE, submit.status)
