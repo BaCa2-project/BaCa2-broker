@@ -95,7 +95,7 @@ class DummyBacaServer(BaseHTTPRequestHandler):
         return httpd, th
 
 
-class BasicTests(ut.TestCase):
+class DummyTests(ut.TestCase):
     test_dir = Path(__file__).absolute().parent
 
     def setUp(self) -> None:
@@ -191,3 +191,39 @@ class BasicTests(ut.TestCase):
                                submit_path=self.test_dir / 'test_packages' / '1' / '1' / 'prog' / 'solution.cpp')
         submit = self.master.submits['2']
         submit.join()
+
+
+class TestsWithKolejka(ut.TestCase):
+    """These tests require a stable connection with Kolejka server."""
+    test_dir = Path(__file__).absolute().parent
+
+    def setUp(self) -> None:
+        if os.path.exists(self.test_dir / 'test.db'):
+            os.remove(self.test_dir / 'test.db')
+        if os.path.exists(self.test_dir / 'tmp_built'):
+            shutil.rmtree(self.test_dir / 'tmp_built')
+        os.mkdir(self.test_dir / 'tmp_built')
+        self.server, self.s_thread = DummyBacaServer.server_run()
+        self.master = BrokerMaster(
+            self.test_dir / 'test.db',
+            self.test_dir / 'tmp_built',
+            delete_records=False)
+        self.master.start()
+        os.system('sqlite3 {} <{}'.format(self.test_dir / 'test.db', self.test_dir.parent / 'db' / 'creator.sql'))
+
+    def tearDown(self) -> None:
+        self.master.stop()
+        self.server.shutdown()
+        self.server.server_close()
+        self.s_thread.join()
+        os.remove(self.test_dir / 'test.db')
+        shutil.rmtree(self.test_dir / 'tmp_built')
+
+    def test_one_submit(self):
+        self.master.new_submit('1',
+                               self.test_dir / 'test_packages' / '1',
+                               '1',
+                               submit_path=self.test_dir / 'test_packages' / '1' / '1' / 'prog' / 'solution.cpp')
+        submit = self.master.submits['1']
+        submit.join()
+        self.assertEqual(SubmitState.DONE, submit.status)
