@@ -4,6 +4,8 @@ from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
 
+load_dotenv()
+
 from baca2PackageManager import set_base_dir, add_supported_extensions
 
 MODES = {

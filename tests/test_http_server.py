@@ -4,6 +4,7 @@ import unittest as ut
 from threading import Thread, Lock
 from time import sleep
 import requests
+from parameterized import parameterized
 
 from broker.server import KolejkaCommunicationManager, BrokerIOServer, BrokerServerHandler
 
@@ -99,10 +100,10 @@ class DetailedTests(ut.TestCase):
 
         def impatient_student():
             # waits for half of the submits
-            for j in reversed(submits[len(submits)//2:]):
+            for j in reversed(submits[len(submits) // 2:]):
                 out = self.manager.await_submit(j, 5.5)
                 self.assertTrue(out)
-            for j in submits[:len(submits)//2]:
+            for j in submits[:len(submits) // 2]:
                 self.manager.await_submit(j, 0.01)
 
         def kolejka():
@@ -123,7 +124,7 @@ class DetailedTests(ut.TestCase):
 
         # at least half of the submits should be deleted
         print("test_add_await_release_errors: %d awaited for" % (1000 - len(self.manager)))
-        self.assertTrue(len(self.manager) <= 1000//2)
+        self.assertTrue(len(self.manager) <= 1000 // 2)
         # all submits should be released
         for i in self.manager.submit_dict.values():
             self.assertFalse(i.locked())
@@ -144,14 +145,14 @@ class TestServerLoop(ut.TestCase):
         self.server.close_server()
 
     def check_http_response(self, *args, **kwargs) -> int:
-        r = requests.post(url=f'http://{self.host}:{self.port}/{BrokerServerHandler.KOLEJKA_PATH}/{kwargs["sub_id"]}')
+        r = requests.post(
+            url=f'http://{self.host}:{self.port}/{BrokerServerHandler.KOLEJKA_PATH}/{kwargs["sub_id"]}')
         return r.status_code
 
-
     def general(self, submit_number: int, wait_interval: float, log: bool = False) -> None:
-        submits = []   # submits ready to be sent
+        submits = []  # submits ready to be sent
         awaiting = []  # submits awaiting checking
-        checked = []   # submits to be awaited for
+        checked = []  # submits to be awaited for
 
         # data integrity locks for the above lists
         submits_lock = Lock()
@@ -239,11 +240,12 @@ class TestServerLoop(ut.TestCase):
         self.assertFalse(checked)
         self.assertFalse(self.manager.submit_dict)
 
-    def test_general1(self) -> None:
-        self.general(submit_number=10, wait_interval=0.05, log=self._log)
-
-    def test_general2(self) -> None:
-        self.general(submit_number=100, wait_interval=0.005, log=self._log)
-
-    def test_general3(self) -> None:
-        self.general(submit_number=3000, wait_interval=0, log=self._log)
+    @parameterized.expand([
+        (10, 0.1),
+        (50, 0.05),
+        (100, 0.005),
+        (3000, 0),
+        (5000, 0)
+    ])
+    def test_general(self, submits_nb, wait_interval) -> None:
+        self.general(submit_number=submits_nb, wait_interval=wait_interval, log=self._log)
