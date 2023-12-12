@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import traceback
+
 import sys
 from threading import Thread, Lock
 from pathlib import Path
@@ -102,6 +104,7 @@ class TaskSubmit(Thread):
         self.sets = []
         self._submit_update_lock = Lock()
         self._gather_results_lock = Lock()
+        self.info_print_lock = Lock()
         self.sets_statuses = {
             SubmitState.ADOPTING: 0,
             SubmitState.SENDING: 0,
@@ -134,9 +137,15 @@ class TaskSubmit(Thread):
     def status(self) -> SubmitState:
         return self.state
 
-    def vprint(self, msg: str):
+    def vprint(self, msg: str, error: str = None):
         if self.verbose:
+            self.info_print_lock.acquire()
             print(f'<{self.submit_id}> {msg}')
+            if error:
+                print('---------------- ERROR ----------------')
+                print(f'<ERR::{self.submit_id}> {error}')
+                print('---------------------------------------')
+            self.info_print_lock.release()
 
     def _change_state(self, state: SubmitState, error_msg: str = None):
         self.state = state
@@ -149,7 +158,7 @@ class TaskSubmit(Thread):
                             state, error_msg, self.submit_id)
 
         if self.verbose:
-            self.vprint(f'Changed state to {state.value} ({state.name})')
+            self.vprint(f'Changed state to {state.value} ({state.name})', error=error_msg)
 
     @property
     def kolejka_client(self) -> Path:
@@ -284,11 +293,14 @@ class TaskSubmit(Thread):
         try:
             self.process()
         except self.BaCa2CommunicationError as e:
-            self._change_state(SubmitState.ERROR, f'{e.__class__.__name__}: {e}')
+            self._change_state(SubmitState.ERROR,
+                               f'{e.__class__.__name__}: {e} \n\n ' +
+                               f'{traceback.format_exc()}')
         except Exception as e:
             self._send_error_to_baca(BACA_ERROR_URL, BACA_PASSWORD, str(e))
-            self._change_state(SubmitState.ERROR, f'{e.__class__.__name__}: {e} \n\n '
-                                                  f'{e.__traceback__.tb_lineno} {e.__traceback__.tb_lasti}')
+            self._change_state(SubmitState.ERROR,
+                               f'{e.__class__.__name__}: {e} \n\n ' +
+                               f'{traceback.format_exc()}')
 
 
 class SetSubmit(Thread):
@@ -332,8 +344,8 @@ class SetSubmit(Thread):
         self.callback_status = CallbackStatus.NOT_SENT
         # self._call_for_update()
 
-    def vprint(self, msg: str):
-        self.task_submit.vprint(f'[{self.set_name}] {msg}')
+    def vprint(self, msg: str, error: str = None):
+        self.task_submit.vprint(f'[{self.set_name}] {msg}', error=error)
 
     def _call_for_update(self):
         self.task_submit.set_submit_update(self.state)
@@ -348,7 +360,7 @@ class SetSubmit(Thread):
             self._conn.exec("UPDATE set_submit_records SET state=?, error_msg=? WHERE submit_id=? AND set_name=?",
                             state, error_msg, self.submit_id, self.set_name)
         if self.task_submit.verbose:
-            self.vprint(f'Changed state to {state.value} ({state.name})')
+            self.vprint(f'Changed state to {state.value} ({state.name})', error=error_msg)
         self._call_for_update()
 
     def _send_submit(self):
@@ -479,5 +491,8 @@ class SetSubmit(Thread):
         try:
             self.process()
         except Exception as e:
-            self._change_state(SubmitState.ERROR, f'{e.__class__.__name__}: {e}')
+            self._change_state(SubmitState.ERROR,
+                               f'{e.__class__.__name__}: {e} \n\n ' +
+                               f'{traceback.format_exc()}')
             # TODO: error handling for BaCa2 srv
+
