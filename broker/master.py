@@ -20,14 +20,16 @@ class BrokerMaster:
                  delete_records: bool = APP_SETTINGS['delete_records'],
                  threads: int = 2
                  ):
-        self.connection = Connection(db_string)
+        self.db_string = db_string
+        self._is_active = False
+        self.connection = None  # To be initialized in start()
         self.delete_records = delete_records
         self.submits_dir = submits_dir
         self.threads = threads
         self.submits = {}
         self.kolejka_manager = KolejkaCommunicationManager()
-        self.broker_server = BrokerIOServer(self.kolejka_manager, self)
-        self.timeout_manager = TimeoutManager()
+        self.broker_server = None  # To be initialized in start()
+        self.timeout_manager = None  # To be initialized in start()
         self.verbose = APP_SETTINGS['verbose']
         if self.verbose:
             print('Broker master initialized')
@@ -36,9 +38,38 @@ class BrokerMaster:
                 print(f'\t{key}: {value}')
 
     def __del__(self):
+        if self._is_active:
+            self.stop()
+
+    @property
+    def is_active(self):
+        return self._is_active
+
+    def start(self):
+        if self._is_active:
+            raise RuntimeError('Broker master is already running')
+        self.connection = Connection(self.db_string)
+        self.broker_server = BrokerIOServer(self.kolejka_manager, self)
+        self.timeout_manager = TimeoutManager()
+        self._is_active = True
+
+    def stop(self):
+        if not self._is_active:
+            raise RuntimeError('Broker master is not running')
         self.broker_server.close_server()
         self.timeout_manager.stop()
+        self._is_active = False
 
+    def serve_until_interrupted(self):
+        if not self._is_active:
+            self.start()
+
+        while True:
+            inp = input("Enter 'STOP' to stop the broker.\n")
+            if inp == 'STOP':
+                break
+
+        self.stop()
 
     @staticmethod
     def refresh_kolejka_src(add_executable_attr: bool = True):
@@ -69,13 +100,16 @@ class BrokerMaster:
                    package_path: Path,
                    commit_id: str,
                    submit_path: Path):
-        submit = TaskSubmit(self,
-                            submit_id,
-                            package_path,
-                            commit_id,
-                            submit_path,
-                            force_rebuild=APP_SETTINGS['force_rebuild'],
-                            verbose=APP_SETTINGS['verbose'])
+        try:
+            submit = TaskSubmit(self,
+                                submit_id,
+                                package_path,
+                                commit_id,
+                                submit_path,
+                                force_rebuild=APP_SETTINGS['force_rebuild'],
+                                verbose=APP_SETTINGS['verbose'])
+        except TaskSubmit.JudgingError:
+            return
         self.submits[submit_id] = submit
         submit.start()
 

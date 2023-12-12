@@ -65,6 +65,16 @@ set_base_dir(PACKAGES_DIR)
 add_supported_extensions('cpp')
 
 BACA_URL = os.getenv('BACA_URL')
+# Number of tries to send a submit results back to BaCa2
+BACA_SEND_TRIES = 1
+# Interval between tries to send a submit results back to BaCa2
+BACA_SEND_INTERVAL = 0.4
+
+# Where results should be sent back to BaCa2
+BACA_RESULTS_URL = f'{BACA_URL}/result'
+# Where error notifications should be sent to BaCa2
+BACA_ERROR_URL = f'{BACA_URL}/error'
+
 # Passwords for protecting communication channels between the broker and BaCa2.
 # PASSWORDS HAVE TO DIFFERENT IN ORDER TO BE EFFECTIVE
 BACA_PASSWORD = os.getenv('BACA_PASSWORD')

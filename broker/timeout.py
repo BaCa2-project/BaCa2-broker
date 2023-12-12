@@ -94,7 +94,10 @@ class TimeoutManager:
 
     def stop(self):
         self.tick.stop()
-        self.tick.join()
+        try:
+            self.tick.join()
+        except TypeError:
+            pass
 
     def check_timeouts(self) -> None:
         with self.timeout_modification_lock:
