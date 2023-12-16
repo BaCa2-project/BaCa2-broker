@@ -17,7 +17,8 @@ import yaml
 from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import *
 from .builder import Builder
-from settings import (BUILD_NAMESPACE, KOLEJKA_CONF, BACA_PASSWORD, BACA_RESULTS_URL, BACA_ERROR_URL,
+from settings import (BUILD_NAMESPACE, KOLEJKA_CONF, BACA_PASSWORD, BACA_RESULTS_URL,
+                      BACA_ERROR_URL,
                       APP_SETTINGS, BACA_SEND_TRIES, BACA_SEND_INTERVAL)
 
 from typing import TYPE_CHECKING
@@ -179,12 +180,14 @@ class TaskSubmit(Thread):
         end_statuses = (self.sets_statuses[SubmitState.ERROR] +
                         self.sets_statuses[SubmitState.DONE] +
                         self.sets_statuses[SubmitState.CANCELED])
-        if self.sets_statuses[status] == len(self.sets) and status not in (SubmitState.DONE, SubmitState.SAVING):
+        if self.sets_statuses[status] == len(self.sets) and status not in (
+        SubmitState.DONE, SubmitState.SAVING):
             self._change_state(status)
         elif end_statuses == len(self.sets):
             ok_statuses = self.sets_statuses[SubmitState.DONE]
             if ok_statuses != len(self.sets):
-                raise self.JudgingError(f'Some sets ended with an error ({ok_statuses}/{len(self.sets)} OK)')
+                raise self.JudgingError(
+                    f'Some sets ended with an error ({ok_statuses}/{len(self.sets)} OK)')
 
     def close_set_submit(self, set_name: str, results: SetResult):
         with self._gather_results_lock:
@@ -281,7 +284,8 @@ class TaskSubmit(Thread):
                 break
             sleep(BACA_SEND_INTERVAL)
         else:
-            raise self.BaCa2CommunicationError(f"Results for TaskSubmit with id {self.submit_id} could not be send.")
+            raise self.BaCa2CommunicationError(
+                f"Results for TaskSubmit with id {self.submit_id} could not be send.")
 
         self._change_state(SubmitState.DONE)
 
@@ -357,8 +361,9 @@ class SetSubmit(Thread):
                             self.submit_id, self.set_name)
             # TODO: Check if following exits thread.
         else:
-            self._conn.exec("UPDATE set_submit_records SET state=?, error_msg=? WHERE submit_id=? AND set_name=?",
-                            state, error_msg, self.submit_id, self.set_name)
+            self._conn.exec(
+                "UPDATE set_submit_records SET state=?, error_msg=? WHERE submit_id=? AND set_name=?",
+                state, error_msg, self.submit_id, self.set_name)
         if self.task_submit.verbose:
             self.vprint(f'Changed state to {state.value} ({state.name})', error=error_msg)
         self._call_for_update()
@@ -397,7 +402,8 @@ class SetSubmit(Thread):
         self.result_code = client_status.stdout.decode('utf-8').strip()
 
         if client_status.returncode != 0:
-            raise self.KOLEJKACommunicationFailed('KOLEJKA client failed to communicate with KOLEJKA server.')
+            raise self.KOLEJKACommunicationFailed(
+                'KOLEJKA client failed to communicate with KOLEJKA server.')
         self.callback_status = CallbackStatus.SENT
 
     def results_get(self) -> bool:
@@ -410,7 +416,8 @@ class SetSubmit(Thread):
 
         result_get = list(_translate_paths(*result_get))
 
-        result_status = subprocess.run(result_get, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        result_status = subprocess.run(result_get, stdout=subprocess.DEVNULL,
+                                       stderr=subprocess.DEVNULL)
 
         if result_status.returncode == 0:
             return True
@@ -440,11 +447,9 @@ class SetSubmit(Thread):
                 timeout=APP_SETTINGS['default_timeout'].total_seconds())
             )
 
-            results_received = False
-            if self.callback_status == CallbackStatus.TIMEOUT:
-                results_received = self.results_get()
-            if results_received:
-                self.success_ping(True)
+            results_received = self.results_get()
+            if results_received and self.callback_status != CallbackStatus.RECEIVED:
+                self.callback_status = CallbackStatus.RECEIVED
 
         if self.callback_status == CallbackStatus.TIMEOUT:
             raise self.KOLEJKACommunicationFailed('KOLEJKA callback timeout')
@@ -495,4 +500,3 @@ class SetSubmit(Thread):
                                f'{e.__class__.__name__}: {e} \n\n ' +
                                f'{traceback.format_exc()}')
             # TODO: error handling for BaCa2 srv
-
