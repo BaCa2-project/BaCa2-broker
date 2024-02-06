@@ -9,6 +9,10 @@ class KolejkaMessengerInterface(ABC):
     def send(self, x: ...):
         ...
 
+    @abstractmethod
+    def parse_results(self, x: ...):
+        ...
+
 
 class BacaMessengerInterface(ABC):
     def __init__(self, master):
