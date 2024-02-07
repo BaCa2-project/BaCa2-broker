@@ -18,15 +18,11 @@ class SetSubmitInterface(ABC):
     def __init__(self,
                  master: 'DataMasterInterface',
                  task_submit: 'TaskSubmitInterface',
-                 set_name: str,
-                 package: Package,
-                 submit_path: Path):
+                 set_name: str):
         self.master = master
         self.task_submit = task_submit
         self.state: SetSubmitInterface.SetState = SetSubmitInterface.SetState.INITIAL
-        self.package = package
         self.set_name = set_name
-        self.submit_path = submit_path
 
     @abstractmethod
     def set_result(self, result: BrokerToBaca):
@@ -54,10 +50,8 @@ class SetSubmit(SetSubmitInterface):
     def __init__(self,
                  master: 'DataMasterInterface',
                  task_submit: 'TaskSubmit',
-                 set_name: str,
-                 package: Package,
-                 submit_path: Path):
-        super().__init__(master, task_submit, set_name, package, submit_path)
+                 set_name: str):
+        super().__init__(master, task_submit, set_name)
         self.result: Optional[BrokerToBaca] = None
         self.status_code: Optional[str] = None
 
@@ -116,13 +110,13 @@ class TaskSubmitInterface(ABC):
     def package(self) -> Package:
         pass
 
-    @abstractmethod
     @property
+    @abstractmethod
     def set_submits(self) -> list[SetSubmitInterface]:
         pass
 
-    @abstractmethod
     @property
+    @abstractmethod
     def results(self) -> list[BrokerToBaca]:
         pass
 
@@ -145,7 +139,7 @@ class TaskSubmit(TaskSubmitInterface):
         self._sets = []
         self._package = await asyncio.to_thread(Package, self.package_path, self.commit_id)
         for t_set in await asyncio.to_thread(self.package.sets):
-            set_submit = self.master.register_set_submit(self, t_set['name'], self.package, self.submit_path)
+            set_submit = self.master.register_set_submit(self, t_set['name'])
             self._sets.append(set_submit)
 
     def all_checked(self) -> bool:
@@ -190,11 +184,7 @@ class DataMasterInterface(ABC):
         ...
 
     @abstractmethod
-    def register_set_submit(self,
-                            task_submit: 'TaskSubmitInterface',
-                            set_name: str,
-                            package: Package,
-                            submit_path: Path) -> SetSubmitInterface:
+    def register_set_submit(self, task_submit: 'TaskSubmitInterface', set_name: str) -> SetSubmitInterface:
         ...
 
     @abstractmethod
@@ -250,15 +240,11 @@ class DataMaster(DataMasterInterface):
         self.task_submits[task_submit_id] = task_submit
         return task_submit
 
-    def register_set_submit(self,
-                            task_submit: 'TaskSubmitInterface',
-                            set_name: str,
-                            package: Package,
-                            submit_path: Path) -> SetSubmitInterface:
+    def register_set_submit(self, task_submit: 'TaskSubmitInterface', set_name: str,) -> SetSubmitInterface:
         set_submit_id = self.make_set_submit_id(task_submit.submit_id, set_name)
         if set_submit_id in self.set_submits:
             raise self.DataMasterError(f"Set submit {set_submit_id} already exists")
-        set_submit = self.set_submit_t(self, task_submit, set_name, package, submit_path)
+        set_submit = self.set_submit_t(self, task_submit, set_name)
         self.set_submits[set_submit_id] = set_submit
         return set_submit
 

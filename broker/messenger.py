@@ -71,7 +71,7 @@ class KolejkaMessenger(KolejkaMessengerInterface):
                      '--callback', callback_url,
                      '--library-path', self.get_kolejka_judge(task_submit.package),
                      self.get_judge_py(task_submit.package),
-                     set_submit.package.build_path(self.build_namespace) / set_submit.set_name / "tests.yaml",
+                     task_submit.package.build_path(self.build_namespace) / set_submit.set_name / "tests.yaml",
                      task_submit.submit_path,
                      task_dir]
         cmd_client = [self.python_call, self.get_kolejka_client(task_submit.package),
