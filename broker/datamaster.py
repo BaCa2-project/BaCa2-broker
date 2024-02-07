@@ -1,3 +1,4 @@
+import asyncio
 from abc import ABC, abstractmethod
 from typing import Optional
 from enum import Enum
@@ -83,6 +84,7 @@ class TaskSubmitInterface(ABC):
         INITIAL = 1
         AWAITING_SETS = 2
         DONE = 3
+        ERROR = -1
 
     def __init__(self,
                  master: 'DataMasterInterface',
@@ -98,7 +100,7 @@ class TaskSubmitInterface(ABC):
         self.submit_path = submit_path
 
     @abstractmethod
-    def initialise(self):
+    async def initialise(self):
         pass
 
     def change_state(self, new_state: TaskState):
@@ -137,12 +139,12 @@ class TaskSubmit(TaskSubmitInterface):
         self._package: Package = None
         self._sets: list[SetSubmitInterface] = None
 
-    def initialise(self):
+    async def initialise(self):
         if self._sets is not None:
             raise ValueError("Sets already filled")
         self._sets = []
-        self._package = Package(self.package_path, self.commit_id)
-        for t_set in self.package.sets():
+        self._package = await asyncio.to_thread(Package, self.package_path, self.commit_id)
+        for t_set in await asyncio.to_thread(self.package.sets):
             set_submit = self.master.register_set_submit(self, t_set['name'], self.package, self.submit_path)
             self._sets.append(set_submit)
 
@@ -265,6 +267,11 @@ class DataMaster(DataMasterInterface):
             self.active_task_submits[task_submit.submit_id] = task_submit
         elif new_state == TaskSubmitInterface.TaskState.DONE:
             del self.active_task_submits[task_submit.submit_id]
+        elif new_state == TaskSubmitInterface.TaskState.ERROR:
+            # TODO: log error
+            pass
+        else:
+            raise RuntimeError(f"Invalid state change {new_state}")
 
     def handle_set_state_change(self, set_submit: SetSubmitInterface, new_state: SetSubmitInterface.SetState):
         set_id = self.make_set_submit_id(set_submit.task_submit.submit_id, set_submit.set_name)
@@ -272,6 +279,8 @@ class DataMaster(DataMasterInterface):
             self.active_set_submits[set_id] = set_submit
         elif new_state == SetSubmitInterface.SetState.DONE:
             del self.active_set_submits[set_id]
+        else:
+            raise RuntimeError(f"Invalid state change {new_state}")
 
     def delete_task_submit(self, task_submit: TaskSubmitInterface):
         if task_submit.submit_id not in self.task_submits:

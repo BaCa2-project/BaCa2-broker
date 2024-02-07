@@ -146,7 +146,7 @@ class BacaMessengerInterface(ABC):
         self.master = master
 
     @abstractmethod
-    async def send(self, task_submit: TaskSubmit) -> bool:
+    async def send(self, task_submit: TaskSubmit):
         ...
 
     @abstractmethod
@@ -170,21 +170,17 @@ class BacaMessenger(BacaMessengerInterface):
                                        task_submit, str(error), self.baca_url, self.password)
 
     @staticmethod
-    def _send_to_baca(task_submit: TaskSubmit, baca_url: str, password: str) -> bool:
+    def _send_to_baca(task_submit: TaskSubmit, baca_url: str, password: str):
         message = BrokerToBaca(
             pass_hash=make_hash(password, task_submit.submit_id),
             submit_id=task_submit.submit_id,
             results=deepcopy(task_submit.results),
         )
-        s = requests.Session()
-        try:
+        with requests.Session() as s:
             r = s.post(url=baca_url, json=message.serialize())
-        except (requests.exceptions.RequestException, requests.exceptions.ChunkedEncodingError):
-            return False
-        else:
-            return r.status_code == 200
-        finally:
-            s.close()
+
+        if r.status_code != 200:
+            raise ConnectionError(f'Failed to send results to baCa2. Status code: {r.status_code}')
 
     @staticmethod
     def _send_error_to_baca(task_submit: TaskSubmit, error_msg: str, baca_url: str, password: str) -> bool:
