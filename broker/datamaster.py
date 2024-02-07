@@ -39,6 +39,14 @@ class SetSubmitInterface(ABC):
     def get_result(self) -> BrokerToBaca:
         pass
 
+    @abstractmethod
+    def set_status_code(self, status_code: str):
+        pass
+
+    @abstractmethod
+    def get_status_code(self) -> str:
+        pass
+
 
 class SetSubmit(SetSubmitInterface):
 
@@ -50,6 +58,7 @@ class SetSubmit(SetSubmitInterface):
                  submit_path: Path):
         super().__init__(master, task_submit, set_name, package, submit_path)
         self.result: Optional[BrokerToBaca] = None
+        self.status_code: Optional[str] = None
 
     def set_result(self, result: BrokerToBaca):
         self.result = result
@@ -62,6 +71,14 @@ class SetSubmit(SetSubmitInterface):
         if self.result is None:
             raise ValueError("No result available")
         return self.result
+
+    def set_status_code(self, status_code: str):
+        self.status_code = status_code
+
+    def get_status_code(self) -> str:
+        if self.status_code is None:
+            raise ValueError("No status code available")
+        return self.status_code
 
 
 class TaskSubmitInterface(ABC):
@@ -97,9 +114,19 @@ class TaskSubmitInterface(ABC):
     def all_checked(self) -> bool:
         pass
 
+    @property
+    @abstractmethod
+    def package(self) -> Package:
+        pass
+
     @abstractmethod
     @property
     def set_submits(self) -> list[SetSubmitInterface]:
+        pass
+
+    @abstractmethod
+    @property
+    def results(self) -> list[BrokerToBaca]:
         pass
 
 
@@ -112,14 +139,14 @@ class TaskSubmit(TaskSubmitInterface):
                  commit_id: str,
                  submit_path: Path):
         super().__init__(master, task_submit_id, package_path, commit_id, submit_path)
-        self.package: Package = None
+        self._package: Package = None
         self._sets: list[SetSubmitInterface] = None
 
     def initialise(self):
         if self._sets is not None:
             raise ValueError("Sets already filled")
         self._sets = []
-        self.package = Package(self.package_path, self.commit_id)
+        self._package = Package(self.package_path, self.commit_id)
         for t_set in self.package.sets():
             set_submit = self.master.register_set_submit(self, t_set['name'], self.package, self.submit_path)
             self._sets.append(set_submit)
@@ -131,7 +158,13 @@ class TaskSubmit(TaskSubmitInterface):
     def all_checked(self) -> bool:
         if self._sets is None:
             raise ValueError("Sets not filled")
-        return all([s.state == SetSubmit.SetState.DONE for s in self._sets])
+        return all([s.state == SetSubmit.SetState.DONE for s in self.set_submits])
+
+    @property
+    def package(self) -> Package:
+        if self._package is None:
+            raise ValueError("Package not filled")
+        return self._package
 
     @property
     def set_submits(self) -> list[SetSubmitInterface]:
@@ -139,8 +172,18 @@ class TaskSubmit(TaskSubmitInterface):
             raise ValueError("Sets not filled")
         return self._sets.copy()
 
+    @property
+    def results(self) -> list[BrokerToBaca]:
+        if not self.all_checked():
+            raise ValueError("Sets not filled")
+        return [s.get_result() for s in self.set_submits]
+
 
 class DataMasterInterface(ABC):
+
+    def __init__(self, task_submit_t: type[TaskSubmitInterface], set_submit_t: type[SetSubmitInterface]):
+        self.task_submit_t = task_submit_t
+        self.set_submit_t = set_submit_t
 
     @abstractmethod
     def handle_task_state_change(self, task_submit: TaskSubmitInterface, new_state: TaskSubmitInterface.TaskState):

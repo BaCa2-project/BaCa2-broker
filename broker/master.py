@@ -25,17 +25,18 @@ class BrokerMaster:
         #     self._build_package()
 
         for s in task_submit.set_submits:
-            self.kolejka_messenger.send(...)  # TODO
+            status_code = await self.kolejka_messenger.send(s)
+            s.set_status_code(status_code)
             s.change_state(s.SetState.AWAITING_KOLEJKA)
 
         task_submit.change_state(task_submit.TaskState.AWAITING_SETS)
 
-    async def handle_kolejka(self, submit_id: int):
+    async def handle_kolejka(self, submit_id: str):
         set_submit = self.data_master.get_set_submit(submit_id)
-        results = self.kolejka_messenger.parse_results(...)  # TODO
+        results = await self.kolejka_messenger.get_results(set_submit, set_submit.get_status_code())
         set_submit.set_result(results)
         set_submit.change_state(set_submit.SetState.DONE)
 
         if set_submit.task_submit.all_checked():
-            self.baca_messenger.send(...)  # TODO
+            await self.baca_messenger.send(set_submit.task_submit)
             set_submit.task_submit.change_state(set_submit.task_submit.TaskState.DONE)
