@@ -63,10 +63,6 @@ class SetSubmit(SetSubmitInterface):
     def set_result(self, result: BrokerToBaca):
         self.result = result
 
-    def change_state(self, new_state: SetSubmitInterface.SetState):
-        self.master.handle_set_state_change(self, new_state)
-        self.state = new_state
-
     def get_result(self) -> BrokerToBaca:
         if self.result is None:
             raise ValueError("No result available")
@@ -86,7 +82,6 @@ class TaskSubmitInterface(ABC):
     class TaskState(Enum):
         INITIAL = 1
         AWAITING_SETS = 2
-        # TO_BE_SENT = 3
         DONE = 3
 
     def __init__(self,
@@ -151,10 +146,6 @@ class TaskSubmit(TaskSubmitInterface):
             set_submit = self.master.register_set_submit(self, t_set['name'], self.package, self.submit_path)
             self._sets.append(set_submit)
 
-    def change_state(self, new_state: TaskSubmitInterface.TaskState):
-        self.master.handle_task_state_change(self, new_state)
-        self.state = new_state
-
     def all_checked(self) -> bool:
         if self._sets is None:
             raise ValueError("Sets not filled")
@@ -180,6 +171,9 @@ class TaskSubmit(TaskSubmitInterface):
 
 
 class DataMasterInterface(ABC):
+
+    class DataMasterError(Exception):
+        pass
 
     def __init__(self, task_submit_t: type[TaskSubmitInterface], set_submit_t: type[SetSubmitInterface]):
         self.task_submit_t = task_submit_t
@@ -221,6 +215,97 @@ class DataMasterInterface(ABC):
     def get_task_submit(self, submit_id: str) -> TaskSubmitInterface:
         ...
 
+    @abstractmethod
+    def get_active_task_submit(self, submit_id: str) -> TaskSubmitInterface:
+        ...
+
+    @abstractmethod
+    def get_active_set_submit(self, submit_id: str) -> SetSubmitInterface:
+        ...
+
 
 class DataMaster(DataMasterInterface):
-    ...
+
+    def __init__(self, task_submit_t: type[TaskSubmitInterface], set_submit_t: type[SetSubmitInterface]):
+        super().__init__(task_submit_t, set_submit_t)
+        self.task_submits: dict[str, TaskSubmit] = {}
+        self.active_task_submits: dict[str, TaskSubmit] = {}
+        self.set_submits: dict[str, SetSubmit] = {}
+        self.active_set_submits: dict[str, SetSubmit] = {}
+
+    @staticmethod
+    def make_set_submit_id(task_submit_id: str, set_name: str) -> str:
+        return f"{task_submit_id}_{set_name}"
+
+    def new_task_submit(self,
+                        task_submit_id: str,
+                        package_path: Path,
+                        commit_id: str,
+                        submit_path: Path) -> TaskSubmitInterface:
+        if task_submit_id in self.task_submits:
+            raise self.DataMasterError(f"Task submit {task_submit_id} already exists")
+        task_submit = self.task_submit_t(self, task_submit_id, package_path, commit_id, submit_path)
+        self.task_submits[task_submit_id] = task_submit
+        return task_submit
+
+    def register_set_submit(self,
+                            task_submit: 'TaskSubmitInterface',
+                            set_name: str,
+                            package: Package,
+                            submit_path: Path) -> SetSubmitInterface:
+        set_submit_id = self.make_set_submit_id(task_submit.submit_id, set_name)
+        if set_submit_id in self.set_submits:
+            raise self.DataMasterError(f"Set submit {set_submit_id} already exists")
+        set_submit = self.set_submit_t(self, task_submit, set_name, package, submit_path)
+        self.set_submits[set_submit_id] = set_submit
+        return set_submit
+
+    def handle_task_state_change(self, task_submit: TaskSubmitInterface, new_state: TaskSubmitInterface.TaskState):
+        if new_state == TaskSubmitInterface.TaskState.AWAITING_SETS:
+            self.active_task_submits[task_submit.submit_id] = task_submit
+        elif new_state == TaskSubmitInterface.TaskState.DONE:
+            del self.active_task_submits[task_submit.submit_id]
+
+    def handle_set_state_change(self, set_submit: SetSubmitInterface, new_state: SetSubmitInterface.SetState):
+        set_id = self.make_set_submit_id(set_submit.task_submit.submit_id, set_submit.set_name)
+        if new_state == SetSubmitInterface.SetState.AWAITING_KOLEJKA:
+            self.active_set_submits[set_id] = set_submit
+        elif new_state == SetSubmitInterface.SetState.DONE:
+            del self.active_set_submits[set_id]
+
+    def delete_task_submit(self, task_submit: TaskSubmitInterface):
+        if task_submit.submit_id not in self.task_submits:
+            raise self.DataMasterError(f"Task submit {task_submit.submit_id} does not exist")
+        for set_submit in task_submit.set_submits:
+            self.delete_set_submit(set_submit)
+        del self.task_submits[task_submit.submit_id]
+        if task_submit.submit_id in self.active_task_submits:
+            del self.active_task_submits[task_submit.submit_id]
+
+    def delete_set_submit(self, set_submit: SetSubmitInterface):
+        set_id = self.make_set_submit_id(set_submit.task_submit.submit_id, set_submit.set_name)
+        if set_id not in self.set_submits:
+            raise self.DataMasterError(f"Set submit {set_id} does not exist")
+        del self.set_submits[set_id]
+        if set_id in self.active_set_submits:
+            del self.active_set_submits[set_id]
+
+    def get_set_submit(self, submit_id: str) -> SetSubmitInterface:
+        if submit_id not in self.set_submits:
+            raise self.DataMasterError(f"Set submit {submit_id} does not exist")
+        return self.set_submits[submit_id]
+
+    def get_task_submit(self, submit_id: str) -> TaskSubmitInterface:
+        if submit_id not in self.task_submits:
+            raise self.DataMasterError(f"Task submit {submit_id} does not exist")
+        return self.task_submits[submit_id]
+
+    def get_active_task_submit(self, submit_id: str) -> TaskSubmitInterface:
+        if submit_id not in self.active_task_submits:
+            raise self.DataMasterError(f"Active task submit {submit_id} does not exist")
+        return self.active_task_submits[submit_id]
+
+    def get_active_set_submit(self, submit_id: str) -> SetSubmitInterface:
+        if submit_id not in self.active_set_submits:
+            raise self.DataMasterError(f"Active set submit {submit_id} does not exist")
+        return self.active_set_submits[submit_id]
