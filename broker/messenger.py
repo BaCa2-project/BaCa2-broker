@@ -6,11 +6,13 @@ import asyncio
 from pathlib import Path
 
 import requests
+import yaml
 from baca2PackageManager import Package
-from baca2PackageManager.broker_communication import BrokerToBaca, make_hash, BrokerToBacaError
+from baca2PackageManager.broker_communication import BrokerToBaca, make_hash, BrokerToBacaError, SetResult, TestResult
 
 from .master import BrokerMaster
 from .datamaster import TaskSubmit, SetSubmit
+from .yaml_tags import get_loader
 
 
 class KolejkaMessengerInterface(ABC):
@@ -26,7 +28,7 @@ class KolejkaMessengerInterface(ABC):
         ...
 
     @abstractmethod
-    async def get_results(self, set_submit: SetSubmit, result_code: str) -> bool:
+    async def get_results(self, set_submit: SetSubmit, result_code: str) -> SetResult:
         ...
 
 
@@ -94,7 +96,7 @@ class KolejkaMessenger(KolejkaMessengerInterface):
 
         return result_code
 
-    def _results_get(self, set_submit: SetSubmit, result_code) -> bool:
+    def _results_get(self, set_submit: SetSubmit, result_code) -> SetResult:
         result_dir = self.submits_dir / set_submit.task_submit.submit_id / f'{set_submit.set_name}.result'
 
         result_get = [self.python_call,
@@ -109,7 +111,28 @@ class KolejkaMessenger(KolejkaMessengerInterface):
         result_status = subprocess.run(result_get, stdout=subprocess.DEVNULL,
                                        stderr=subprocess.DEVNULL)
 
-        return result_status.returncode == 0
+        if result_status.returncode != 0:
+            raise self.KolejkaCommunicationFailed('KOLEJKA client failed to get results.')
+
+        return self._parse_results(set_submit, result_dir)
+
+    @staticmethod
+    def _parse_results(set_submit: SetSubmit, result_dir: Path) -> SetResult:
+        results_yaml = result_dir / 'results' / 'results.yaml'
+        with open(results_yaml) as f:
+            content: dict = yaml.load(f, Loader=get_loader())
+        tests = {}
+        for key, val in content.items():
+            satori = val['satori']
+            tmp = TestResult(
+                name=key,
+                status=satori['status'],
+                time_real=float(satori['execute_time_real'][:-1]),
+                time_cpu=float(satori['execute_time_cpu'][:-1]),
+                runtime_memory=int(satori['execute_memory'][:-1])
+            )
+            tests[key] = tmp
+        return SetResult(name=set_submit.set_name, tests=tests)
 
     async def send(self, set_submit: SetSubmit) -> str:
         return await asyncio.to_thread(self._send_submit, set_submit)
