@@ -24,6 +24,8 @@ class SetSubmitInterface(ABC):
         self.task_submit = task_submit
         self.state: SetSubmitInterface.SetState = SetSubmitInterface.SetState.INITIAL
         self.set_name = set_name
+        self.creation_date = datetime.now()
+        self.mod_date = self.creation_date
 
     @abstractmethod
     def set_result(self, result: BrokerToBaca):
@@ -31,6 +33,7 @@ class SetSubmitInterface(ABC):
 
     def change_state(self, new_state: SetState):
         self.master.handle_set_state_change(self, new_state)
+        self.mod_date = datetime.now()
         self.state = new_state
 
     @abstractmethod

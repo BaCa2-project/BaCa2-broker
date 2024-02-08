@@ -60,7 +60,8 @@ class KolejkaMessenger(KolejkaMessengerInterface):
         return package.build_path(self.build_namespace) / 'common' / 'judge.py'
 
     def kolejka_callback_url(self, submit_id: str) -> str:
-        return self.kolejka_callback_url_prefix + str(submit_id)
+        mid = '' if self.kolejka_callback_url_prefix.endswith('/') else '/'
+        return self.kolejka_callback_url_prefix + mid + str(submit_id)
 
     async def send(self, set_submit: SetSubmit) -> str:
         try:
