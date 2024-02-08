@@ -1,5 +1,6 @@
 import asyncio
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Optional
 from enum import Enum
 from pathlib import Path
@@ -92,6 +93,13 @@ class TaskSubmitInterface(ABC):
         self.package_path = package_path
         self.commit_id = commit_id
         self.submit_path = submit_path
+        self.creation_date = datetime.now()
+        self.mod_date = self.creation_date
+
+    @staticmethod
+    @abstractmethod
+    def make_set_submit_id(task_submit_id: str, set_name: str) -> str:
+        ...
 
     @abstractmethod
     async def initialise(self):
@@ -99,6 +107,7 @@ class TaskSubmitInterface(ABC):
 
     def change_state(self, new_state: TaskState):
         self.master.handle_task_state_change(self, new_state)
+        self.mod_date = datetime.now()
         self.state = new_state
 
     @abstractmethod
@@ -132,6 +141,10 @@ class TaskSubmit(TaskSubmitInterface):
         super().__init__(master, task_submit_id, package_path, commit_id, submit_path)
         self._package: Package = None
         self._sets: list[SetSubmitInterface] = None
+
+    @staticmethod
+    def make_set_submit_id(task_submit_id: str, set_name: str) -> str:
+        return f"{task_submit_id}_{set_name}"
 
     async def initialise(self):
         if self._sets is not None:
@@ -225,10 +238,6 @@ class DataMaster(DataMasterInterface):
         self.set_submits: dict[str, SetSubmit] = {}
         self.active_set_submits: dict[str, SetSubmit] = {}
 
-    @staticmethod
-    def make_set_submit_id(task_submit_id: str, set_name: str) -> str:
-        return f"{task_submit_id}_{set_name}"
-
     def new_task_submit(self,
                         task_submit_id: str,
                         package_path: Path,
@@ -241,7 +250,7 @@ class DataMaster(DataMasterInterface):
         return task_submit
 
     def register_set_submit(self, task_submit: 'TaskSubmitInterface', set_name: str,) -> SetSubmitInterface:
-        set_submit_id = self.make_set_submit_id(task_submit.submit_id, set_name)
+        set_submit_id = task_submit.make_set_submit_id(task_submit.submit_id, set_name)
         if set_submit_id in self.set_submits:
             raise self.DataMasterError(f"Set submit {set_submit_id} already exists")
         set_submit = self.set_submit_t(self, task_submit, set_name)
@@ -260,7 +269,7 @@ class DataMaster(DataMasterInterface):
             raise RuntimeError(f"Invalid state change {new_state}")
 
     def handle_set_state_change(self, set_submit: SetSubmitInterface, new_state: SetSubmitInterface.SetState):
-        set_id = self.make_set_submit_id(set_submit.task_submit.submit_id, set_submit.set_name)
+        set_id = set_submit.task_submit.make_set_submit_id(set_submit.task_submit.submit_id, set_submit.set_name)
         if new_state == SetSubmitInterface.SetState.AWAITING_KOLEJKA:
             self.active_set_submits[set_id] = set_submit
         elif new_state == SetSubmitInterface.SetState.DONE:
@@ -278,7 +287,7 @@ class DataMaster(DataMasterInterface):
             del self.active_task_submits[task_submit.submit_id]
 
     def delete_set_submit(self, set_submit: SetSubmitInterface):
-        set_id = self.make_set_submit_id(set_submit.task_submit.submit_id, set_submit.set_name)
+        set_id = set_submit.task_submit.make_set_submit_id(set_submit.task_submit.submit_id, set_submit.set_name)
         if set_id not in self.set_submits:
             raise self.DataMasterError(f"Set submit {set_id} does not exist")
         del self.set_submits[set_id]
