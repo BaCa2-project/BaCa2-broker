@@ -4,7 +4,7 @@ from baca2PackageManager.broker_communication import BacaToBroker
 from aiologger import Logger
 
 from .messenger import KolejkaMessengerInterface, BacaMessengerInterface, PackageManagerInterface
-from .datamaster import DataMasterInterface, SetSubmit
+from .datamaster import DataMasterInterface, SetSubmitInterface
 
 
 class BrokerMaster:
@@ -21,7 +21,7 @@ class BrokerMaster:
         self.package_manager = package_manager
         self.logger = logger
 
-    async def _kolejka_send_task(self, set_submit: SetSubmit):
+    async def _kolejka_send_task(self, set_submit: SetSubmitInterface):
         set_submit.change_state(set_submit.SetState.SENDING_TO_KOLEJKA)
         status_code = await self.kolejka_messenger.send(set_submit)
         set_submit.set_status_code(status_code)
@@ -59,7 +59,7 @@ class BrokerMaster:
             await self.logger.error(str(e))
             raise
 
-        if set_submit.state == set_submit.SetState.AWAITING_KOLEJKA:
+        if not set_submit.is_active():
             await self.logger.error(f"Set submit {submit_id} in invalid state")
             raise Exception(f"Set submit {submit_id} in invalid state")  # TODO
 
@@ -70,8 +70,8 @@ class BrokerMaster:
 
             if set_submit.task_submit.all_checked():
                 task_submit = set_submit.task_submit
-                await self.baca_messenger.send(task_submit)
                 task_submit.change_state(task_submit.TaskState.DONE)
+                await self.baca_messenger.send(task_submit)
                 self.data_master.delete_task_submit(task_submit)
 
         except Exception as e:

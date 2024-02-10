@@ -16,7 +16,7 @@ from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import BrokerToBaca, make_hash, BrokerToBacaError, SetResult, TestResult
 
 from .builder import Builder
-from .datamaster import TaskSubmit, SetSubmit
+from .datamaster import TaskSubmitInterface, SetSubmitInterface
 from .yaml_tags import get_loader
 
 
@@ -26,11 +26,11 @@ class KolejkaMessengerInterface(ABC):
         pass
 
     @abstractmethod
-    async def send(self, set_submit: SetSubmit) -> str:
+    async def send(self, set_submit: SetSubmitInterface) -> str:
         pass
 
     @abstractmethod
-    async def get_results(self, set_submit: SetSubmit, result_code: str) -> SetResult:
+    async def get_results(self, set_submit: SetSubmitInterface, result_code: str) -> SetResult:
         pass
 
 
@@ -62,14 +62,14 @@ class KolejkaMessenger(KolejkaMessengerInterface):
         mid = '' if self.kolejka_callback_url_prefix.endswith('/') else '/'
         return self.kolejka_callback_url_prefix + mid + str(submit_id)
 
-    async def send(self, set_submit: SetSubmit) -> str:
+    async def send(self, set_submit: SetSubmitInterface) -> str:
         try:
             return await self._send_inner(set_submit)
         except Exception as e:
             await self.logger.error(str(e))
             raise self.KolejkaCommunicationError("Cannot communicate with KOLEJKA.") from e
 
-    async def _send_inner(self, set_submit: SetSubmit) -> str:
+    async def _send_inner(self, set_submit: SetSubmitInterface) -> str:
         task_submit = set_submit.task_submit
 
         task_dir = self.submits_dir / task_submit.submit_id / f'{set_submit.set_name}.task'
@@ -114,14 +114,14 @@ class KolejkaMessenger(KolejkaMessengerInterface):
 
         return result_code
 
-    async def get_results(self, set_submit: SetSubmit, result_code: str) -> SetResult:
+    async def get_results(self, set_submit: SetSubmitInterface, result_code: str) -> SetResult:
         try:
             return await self._get_results_inner(set_submit, result_code)
         except Exception as e:
             await self.logger.error(str(e))
             raise self.KolejkaCommunicationError("Cannot communicate with KOLEJKA.") from e
 
-    async def _get_results_inner(self, set_submit: SetSubmit, result_code: str) -> SetResult:
+    async def _get_results_inner(self, set_submit: SetSubmitInterface, result_code: str) -> SetResult:
         result_dir = self.submits_dir / set_submit.task_submit.submit_id / f'{set_submit.set_name}.result'
 
         result_get = [self.python_call,
@@ -145,7 +145,7 @@ class KolejkaMessenger(KolejkaMessengerInterface):
         return self._parse_results(set_submit, result_dir)
 
     @staticmethod
-    def _parse_results(set_submit: SetSubmit, result_dir: Path) -> SetResult:  # TODO: change to async?
+    def _parse_results(set_submit: SetSubmitInterface, result_dir: Path) -> SetResult:  # TODO: change to async?
         results_yaml = result_dir / 'results' / 'results.yaml'
         with open(results_yaml) as f:
             content: dict = yaml.load(f, Loader=get_loader())
@@ -169,11 +169,11 @@ class BacaMessengerInterface(ABC):
         pass
 
     @abstractmethod
-    async def send(self, task_submit: TaskSubmit):
+    async def send(self, task_submit: TaskSubmitInterface):
         pass
 
     @abstractmethod
-    async def send_error(self, task_submit: TaskSubmit, error: Exception) -> bool:
+    async def send_error(self, task_submit: TaskSubmitInterface, error: Exception) -> bool:
         pass
 
 
@@ -191,7 +191,7 @@ class BacaMessenger(BacaMessengerInterface):
             self.logger.error(str(e))
             raise self.BacaMessengerError("Cannot communicate with baCa2.") from e
 
-    async def send_error(self, task_submit: TaskSubmit, error: Exception) -> bool:
+    async def send_error(self, task_submit: TaskSubmitInterface, error: Exception) -> bool:
         try:
             return await self._send_error_to_baca(task_submit, str(error), self.baca_url, self.password)
         except Exception as e:
@@ -199,7 +199,7 @@ class BacaMessenger(BacaMessengerInterface):
             return False
 
     @staticmethod
-    async def _send_to_baca(task_submit: TaskSubmit, baca_url: str, password: str):
+    async def _send_to_baca(task_submit: TaskSubmitInterface, baca_url: str, password: str):
         message = BrokerToBaca(
             pass_hash=make_hash(password, task_submit.submit_id),
             submit_id=task_submit.submit_id,
@@ -214,7 +214,10 @@ class BacaMessenger(BacaMessengerInterface):
             raise ConnectionError(f'Failed to send results to baCa2. Status code: {status_code}')
 
     @staticmethod
-    async def _send_error_to_baca(task_submit: TaskSubmit, error_msg: str, baca_url: str, password: str) -> bool:
+    async def _send_error_to_baca(task_submit: TaskSubmitInterface,
+                                  error_msg: str,
+                                  baca_url: str,
+                                  password: str) -> bool:
         message = BrokerToBacaError(
             pass_hash=make_hash(password, task_submit.submit_id),
             submit_id=task_submit.submit_id,

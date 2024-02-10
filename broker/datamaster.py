@@ -32,6 +32,9 @@ class SetSubmitInterface(ABC):
         self.mod_date = datetime.now()
         self.state = new_state
 
+    def is_active(self) -> bool:
+        return self.state == self.SetState.AWAITING_KOLEJKA
+
     @abstractmethod
     def set_result(self, result: BrokerToBaca):
         pass
