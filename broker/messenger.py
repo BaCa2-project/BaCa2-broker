@@ -26,11 +26,11 @@ class KolejkaMessengerInterface(ABC):
 
     @abstractmethod
     async def send(self, set_submit: SetSubmit) -> str:
-        ...
+        pass
 
     @abstractmethod
     async def get_results(self, set_submit: SetSubmit, result_code: str) -> SetResult:
-        ...
+        pass
 
 
 class KolejkaMessenger(KolejkaMessengerInterface):
@@ -67,7 +67,7 @@ class KolejkaMessenger(KolejkaMessengerInterface):
         try:
             return await self._send_inner(set_submit)
         except Exception as e:
-            self.logger.error(str(e))
+            await self.logger.error(str(e))
             raise self.KolejkaCommunicationError("Cannot communicate with KOLEJKA.") from e
 
     async def _send_inner(self, set_submit: SetSubmit) -> str:
@@ -119,7 +119,7 @@ class KolejkaMessenger(KolejkaMessengerInterface):
         try:
             return await self._get_results_inner(set_submit, result_code)
         except Exception as e:
-            self.logger.error(str(e))
+            await self.logger.error(str(e))
             raise self.KolejkaCommunicationError("Cannot communicate with KOLEJKA.") from e
 
     async def _get_results_inner(self, set_submit: SetSubmit, result_code: str) -> SetResult:
@@ -174,11 +174,11 @@ class BacaMessengerInterface(ABC):
 
     @abstractmethod
     async def send(self, task_submit: TaskSubmit):
-        ...
+        pass
 
     @abstractmethod
     async def send_error(self, task_submit: TaskSubmit, error: Exception) -> bool:
-        ...
+        pass
 
 
 class BacaMessenger(BacaMessengerInterface):
