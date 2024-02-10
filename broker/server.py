@@ -10,7 +10,7 @@ from settings import (BROKER_PASSWORD, SUBMITS_DIR, BUILD_NAMESPACE, KOLEJKA_CON
 
 from .master import BrokerMaster
 from .datamaster import DataMaster, SetSubmit, TaskSubmit
-from messenger import KolejkaMessenger, BacaMessenger, PackageManager
+from .messenger import KolejkaMessenger, BacaMessenger, PackageManager
 
 
 logger = Logger.with_default_handlers(name="broker")
