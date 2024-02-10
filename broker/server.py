@@ -4,15 +4,51 @@ from baca2PackageManager.broker_communication import BacaToBroker, make_hash
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from settings import BROKER_PASSWORD
+from aiologger import Logger
+from settings import (BROKER_PASSWORD, SUBMITS_DIR, BUILD_NAMESPACE, KOLEJKA_CONF,
+                      KOLEJKA_CALLBACK_URL_PREFIX, BACA_URL, BACA_PASSWORD, KOLEJKA_SRC_DIR)
 
 from .master import BrokerMaster
+from .datamaster import DataMaster, SetSubmit, TaskSubmit
+from messenger import KolejkaMessenger, BacaMessenger, PackageManager
 
-master = BrokerMaster(  # TODO
-    None,
-    None,
-    None
+
+logger = Logger.with_default_handlers(name="broker")
+broker_password = BROKER_PASSWORD
+
+data_master = DataMaster(
+    task_submit_t=TaskSubmit,
+    set_submit_t=SetSubmit
 )
+
+kolejka_messanger = KolejkaMessenger(
+    submits_dir=SUBMITS_DIR,
+    build_namespace=BUILD_NAMESPACE,
+    kolejka_conf=KOLEJKA_CONF,
+    kolejka_callback_url_prefix=KOLEJKA_CALLBACK_URL_PREFIX,
+    logger=logger
+)
+
+baca_messanger = BacaMessenger(
+    baca_url=BACA_URL,
+    password=BACA_PASSWORD,
+    logger=logger
+)
+
+package_manager = PackageManager(
+    kolejka_src_dir=KOLEJKA_SRC_DIR,
+    build_namespace=BUILD_NAMESPACE,
+    force_rebuild=False,
+)
+
+master = BrokerMaster(
+    data_master=data_master,
+    kolejka_messenger=kolejka_messanger,
+    baca_messenger=baca_messanger,
+    package_manager=package_manager,
+    logger=logger
+)
+
 app = FastAPI()
 
 
@@ -41,8 +77,6 @@ async def kolejka_post(submit_id: str):
 @app.post("/baca")
 async def baca_post(content: Content):
     """Handle submit request from baCa2"""
-    broker_password = BROKER_PASSWORD
-
     btb = BacaToBroker(content.pass_hash,
                        content.submit_id,
                        content.package_path,

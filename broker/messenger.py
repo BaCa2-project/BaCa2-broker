@@ -42,9 +42,9 @@ class KolejkaMessenger(KolejkaMessengerInterface):
                  kolejka_conf: Path,
                  kolejka_callback_url_prefix: str,
                  logger: Logger):
-        self.submits_dir = submits_dir  # SUBMITS_DIR
-        self.build_namespace = build_namespace  # BUILD_NAMESPACE
-        self.kolejka_conf = kolejka_conf  # KOLEJKA_CONF
+        self.submits_dir = submits_dir
+        self.build_namespace = build_namespace
+        self.kolejka_conf = kolejka_conf
         self.python_call: str = 'python3' if sys.platform.startswith('win') else 'py'
         self.kolejka_callback_url_prefix = kolejka_callback_url_prefix
         self.logger = logger
