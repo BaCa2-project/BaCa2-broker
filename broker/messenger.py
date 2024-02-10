@@ -1,3 +1,6 @@
+import os
+import shutil
+import stat
 import subprocess
 import sys
 from abc import ABC, abstractmethod
@@ -5,13 +8,14 @@ from copy import deepcopy
 import asyncio
 from pathlib import Path
 
+import requests
 import yaml
 import aiohttp
 from aiologger import Logger
 from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import BrokerToBaca, make_hash, BrokerToBacaError, SetResult, TestResult
 
-from .master import BrokerMaster
+from .builder import Builder
 from .datamaster import TaskSubmit, SetSubmit
 from .yaml_tags import get_loader
 
@@ -20,9 +24,6 @@ class KolejkaMessengerInterface(ABC):
 
     class KolejkaCommunicationError(Exception):
         pass
-
-    def __init__(self, master: BrokerMaster):
-        self.master = master
 
     @abstractmethod
     async def send(self, set_submit: SetSubmit) -> str:
@@ -36,13 +37,11 @@ class KolejkaMessengerInterface(ABC):
 class KolejkaMessenger(KolejkaMessengerInterface):
 
     def __init__(self,
-                 master: BrokerMaster,
                  submits_dir: Path,
                  build_namespace: str,
                  kolejka_conf: Path,
                  kolejka_callback_url_prefix: str,
                  logger: Logger):
-        super().__init__(master)
         self.submits_dir = submits_dir  # SUBMITS_DIR
         self.build_namespace = build_namespace  # BUILD_NAMESPACE
         self.kolejka_conf = kolejka_conf  # KOLEJKA_CONF
@@ -169,9 +168,6 @@ class BacaMessengerInterface(ABC):
     class BacaMessengerError(Exception):
         pass
 
-    def __init__(self, master):
-        self.master = master
-
     @abstractmethod
     async def send(self, task_submit: TaskSubmit):
         pass
@@ -183,8 +179,7 @@ class BacaMessengerInterface(ABC):
 
 class BacaMessenger(BacaMessengerInterface):
 
-    def __init__(self, master: BrokerMaster, baca_url: str, password: str, logger: Logger):
-        super().__init__(master)
+    def __init__(self, baca_url: str, password: str, logger: Logger):
         self.baca_url = baca_url
         self.password = password
         self.logger = logger
@@ -230,3 +225,61 @@ class BacaMessenger(BacaMessengerInterface):
                 status_code = response.status
 
         return status_code == 200
+
+
+class PackageManagerInterface(ABC):
+
+    def __init__(self, force_rebuild: bool):
+        self.force_rebuild = force_rebuild
+
+    @abstractmethod
+    async def check_build(self, package: Package) -> bool:
+        pass
+
+    @abstractmethod
+    async def build_package(self, package: Package):
+        pass
+
+
+class PackageManager(PackageManagerInterface):
+
+    def __init__(self,
+                 kolejka_src_dir: Path,
+                 build_namespace: str,
+                 force_rebuild: bool):
+        super().__init__(force_rebuild)
+        self.kolejka_src_dir = kolejka_src_dir
+        self.build_namespace = build_namespace
+
+    def refresh_kolejka_src(self, add_executable_attr: bool = True):  # TODO: change to async?
+        if self.kolejka_src_dir.is_dir():
+            shutil.rmtree(self.kolejka_src_dir)
+        self.kolejka_src_dir.mkdir()
+
+        kolejka_judge = requests.get('https://kolejka.matinf.uj.edu.pl/kolejka-judge').content
+        kolejka_client = requests.get('https://kolejka.matinf.uj.edu.pl/kolejka-client').content
+
+        kolejka_judge_path = self.kolejka_src_dir / 'kolejka-judge'
+        kolejka_client_path = self.kolejka_src_dir / 'kolejka-client'
+
+        with open(kolejka_judge_path, mode='wb') as judge:
+            judge.write(kolejka_judge)
+        with open(kolejka_client_path, mode='wb') as client:
+            client.write(kolejka_client)
+
+        if add_executable_attr:
+            current_judge = os.stat(kolejka_judge_path)
+            current_client = os.stat(kolejka_client_path)
+
+            os.chmod(kolejka_judge_path, current_judge.st_mode | stat.S_IEXEC)
+            os.chmod(kolejka_client_path, current_client.st_mode | stat.S_IEXEC)
+
+    async def check_build(self, package: Package) -> bool:
+        return await asyncio.to_thread(package.check_build, self.build_namespace)
+
+    async def build_package(self, package: Package):
+        if self.force_rebuild:
+            await asyncio.to_thread(self.refresh_kolejka_src)
+
+        build_pkg = Builder(package)
+        await asyncio.to_thread(build_pkg.build)

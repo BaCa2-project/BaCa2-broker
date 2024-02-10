@@ -3,7 +3,7 @@ import asyncio
 from baca2PackageManager.broker_communication import BacaToBroker
 from aiologger import Logger
 
-from .messenger import KolejkaMessengerInterface, BacaMessengerInterface
+from .messenger import KolejkaMessengerInterface, BacaMessengerInterface, PackageManagerInterface
 from .datamaster import DataMasterInterface, SetSubmit
 
 
@@ -13,10 +13,12 @@ class BrokerMaster:
                  data_master: DataMasterInterface,
                  kolejka_messenger: KolejkaMessengerInterface,
                  baca_messenger: BacaMessengerInterface,
+                 package_manager: PackageManagerInterface,
                  logger: Logger):
         self.kolejka_messenger = kolejka_messenger
         self.baca_messenger = baca_messenger
         self.data_master = data_master
+        self.package_manager = package_manager
         self.logger = logger
 
     async def _kolejka_send_task(self, set_submit: SetSubmit):
@@ -31,10 +33,11 @@ class BrokerMaster:
                                                        data.commit_id,
                                                        data.submit_path)
         try:
+            if not self.package_manager.check_build(task_submit.package) or self.package_manager.force_rebuild:
+                await self.package_manager.build_package(task_submit.package)
+
             await task_submit.initialise()
             task_submit.change_state(task_submit.TaskState.AWAITING_SETS)
-            # if (not self.package.check_build(BUILD_NAMESPACE)) or self.force_rebuild:  # TODO
-            #     self._build_package()
             async with asyncio.TaskGroup() as tg:
                 tasks = []
                 for s in task_submit.set_submits:
