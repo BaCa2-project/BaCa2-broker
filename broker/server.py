@@ -69,7 +69,7 @@ async def kolejka_post(submit_id: str):
     if not submit_normalized.isalnum():
         raise HTTPException(status_code=400)
 
-    await asyncio.create_task(master.handle_kolejka(submit_normalized))
+    await asyncio.create_task(master.handle_kolejka(submit_normalized), name=submit_normalized)
 
     return {"message": "Success", "status_code": 200}
 
@@ -86,6 +86,6 @@ async def baca_post(content: Content):
     if make_hash(broker_password, btb.submit_id) != btb.pass_hash:
         raise HTTPException(status_code=401, detail="Wrong Password")
 
-    await asyncio.create_task(master.handle_baca(btb))
+    await asyncio.create_task(master.handle_baca(btb), name=btb.submit_id)
 
     return {"message": "Success", "status_code": 200}

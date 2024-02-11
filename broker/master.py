@@ -21,11 +21,17 @@ class BrokerMaster:
         self.package_manager = package_manager
         self.logger = logger
 
+    @staticmethod
+    def delete_all_tasks_by_name(name: str):
+        for task in asyncio.all_tasks():
+            if task.get_name() == name:
+                task.cancel()
+
     async def _kolejka_send_task(self, set_submit: SetSubmitInterface):
-        set_submit.change_state(set_submit.SetState.SENDING_TO_KOLEJKA)
+        await set_submit.change_state(set_submit.SetState.SENDING_TO_KOLEJKA)
         status_code = await self.kolejka_messenger.send(set_submit)
         set_submit.set_status_code(status_code)
-        set_submit.change_state(set_submit.SetState.AWAITING_KOLEJKA)
+        await set_submit.change_state(set_submit.SetState.AWAITING_KOLEJKA)
 
     async def handle_baca(self, data: BacaToBroker):
         task_submit = self.data_master.new_task_submit(data.submit_id,
@@ -63,8 +69,8 @@ class BrokerMaster:
             await self.logger.error(f"Set submit {submit_id} in invalid state")
             raise Exception(f"Set submit {submit_id} in invalid state")  # TODO
 
-        set_submit.change_state(set_submit.SetState.DONE)
         try:
+            await set_submit.change_state(set_submit.SetState.DONE, timeout=10)
             results = await self.kolejka_messenger.get_results(set_submit, set_submit.get_status_code())
             set_submit.set_result(results)
 
@@ -76,6 +82,7 @@ class BrokerMaster:
 
         except Exception as e:
             task_submit = set_submit.task_submit
+            # self.delete_all_tasks_by_name(submit_id)
             await self.baca_messenger.send_error(task_submit, e)
             task_submit.change_state(task_submit.TaskState.ERROR)
             self.data_master.delete_task_submit(task_submit)

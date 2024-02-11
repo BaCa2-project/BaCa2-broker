@@ -12,10 +12,10 @@ from baca2PackageManager.broker_communication import BrokerToBaca
 class SetSubmitInterface(ABC):
 
     class SetState(Enum):
-        INITIAL = 1
-        SENDING_TO_KOLEJKA = 2
-        AWAITING_KOLEJKA = 3
-        DONE = 4
+        INITIAL = 0
+        SENDING_TO_KOLEJKA = 1
+        AWAITING_KOLEJKA = 2
+        DONE = 3
 
     def __init__(self,
                  master: 'DataMasterInterface',
@@ -27,13 +27,19 @@ class SetSubmitInterface(ABC):
         self.set_name = set_name
         self.creation_date = datetime.now()
         self.mod_date = self.creation_date
+        self.state_lock = asyncio.Lock()
 
-    def change_state(self, new_state: SetState):
+    async def change_state(self, new_state: SetState, timeout: int | None = None):
+        if int(new_state) - int(self.state) != 1 and int(new_state) >= 0:
+            with asyncio.Timeout(timeout):
+                await self.state_lock.acquire()
         self.mod_date = datetime.now()
         self.state = new_state
+        if self.state_lock.locked():
+            self.state_lock.release()
 
     def is_active(self) -> bool:
-        return self.state == self.SetState.AWAITING_KOLEJKA
+        return self.state in [self.SetState.AWAITING_KOLEJKA, self.SetState.SENDING_TO_KOLEJKA]
 
     @abstractmethod
     def set_result(self, result: BrokerToBaca):
@@ -82,9 +88,9 @@ class SetSubmit(SetSubmitInterface):
 class TaskSubmitInterface(ABC):
 
     class TaskState(Enum):
-        INITIAL = 1
-        AWAITING_SETS = 2
-        DONE = 3
+        INITIAL = 0
+        AWAITING_SETS = 1
+        DONE = 2
         ERROR = -1
 
     def __init__(self,
