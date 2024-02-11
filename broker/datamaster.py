@@ -27,16 +27,15 @@ class SetSubmitInterface(ABC):
         self.set_name = set_name
         self.creation_date = datetime.now()
         self.mod_date = self.creation_date
-        self.state_lock = asyncio.Lock()
+        self.state_event = asyncio.Event()
 
     async def change_state(self, new_state: SetState, timeout: int | None = None):
-        if int(new_state) - int(self.state) != 1 and int(new_state) >= 0:
-            with asyncio.Timeout(timeout):
-                await self.state_lock.acquire()
+        while new_state.value - self.state.value != 1 and new_state.value >= 0:
+            self.state_event.clear()
+            await asyncio.wait_for(self.state_event.wait(), timeout)
         self.mod_date = datetime.now()
         self.state = new_state
-        if self.state_lock.locked():
-            self.state_lock.release()
+        self.state_event.set()
 
     def is_active(self) -> bool:
         return self.state in [self.SetState.AWAITING_KOLEJKA, self.SetState.SENDING_TO_KOLEJKA]
