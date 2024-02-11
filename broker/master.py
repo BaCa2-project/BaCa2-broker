@@ -21,12 +21,6 @@ class BrokerMaster:
         self.package_manager = package_manager
         self.logger = logger
 
-    @staticmethod
-    def delete_all_tasks_by_name(name: str):
-        for task in asyncio.all_tasks():
-            if task.get_name() == name:
-                task.cancel()
-
     async def _kolejka_send_task(self, set_submit: SetSubmitInterface):
         await set_submit.change_state(set_submit.SetState.SENDING_TO_KOLEJKA)
         status_code = await self.kolejka_messenger.send(set_submit)
@@ -82,7 +76,6 @@ class BrokerMaster:
 
         except Exception as e:
             task_submit = set_submit.task_submit
-            # self.delete_all_tasks_by_name(submit_id)
             await self.baca_messenger.send_error(task_submit, e)
             task_submit.change_state(task_submit.TaskState.ERROR)
             self.data_master.delete_task_submit(task_submit)
