@@ -33,10 +33,11 @@ class BrokerMaster:
                                                        data.commit_id,
                                                        data.submit_path)
         try:
-            if not self.package_manager.check_build(task_submit.package) or self.package_manager.force_rebuild:
+            await task_submit.initialise()
+
+            if not await self.package_manager.check_build(task_submit.package) or self.package_manager.force_rebuild:
                 await self.package_manager.build_package(task_submit.package)
 
-            await task_submit.initialise()
             task_submit.change_state(task_submit.TaskState.AWAITING_SETS)
             async with asyncio.TaskGroup() as tg:
                 tasks = []
@@ -56,7 +57,7 @@ class BrokerMaster:
         try:
             set_submit = self.data_master.get_set_submit(submit_id)
         except self.data_master.DataMasterError as e:
-            await self.logger.error(str(e))
+            # await self.logger.error(str(e))  # FIXME
             raise
 
         if not set_submit.is_active():
