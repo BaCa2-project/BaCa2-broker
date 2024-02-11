@@ -3,8 +3,8 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
 from aiologger import Logger
-from settings import (BROKER_PASSWORD, SUBMITS_DIR, BUILD_NAMESPACE, KOLEJKA_CONF,
-                      KOLEJKA_CALLBACK_URL_PREFIX, BACA_URL, BACA_PASSWORD, KOLEJKA_SRC_DIR)
+from settings import (BROKER_PASSWORD, SUBMITS_DIR, BUILD_NAMESPACE, KOLEJKA_CONF, KOLEJKA_CALLBACK_URL_PREFIX,
+                      BACA_RESULTS_URL, BACA_ERROR_URL, BACA_PASSWORD, KOLEJKA_SRC_DIR)
 
 from .master import BrokerMaster
 from .datamaster import DataMaster, SetSubmit, TaskSubmit
@@ -28,7 +28,8 @@ kolejka_messanger = KolejkaMessenger(
 )
 
 baca_messanger = BacaMessenger(
-    baca_url=BACA_URL,
+    baca_success_url=BACA_RESULTS_URL,
+    baca_failure_url=BACA_ERROR_URL,
     password=BACA_PASSWORD,
     logger=logger
 )

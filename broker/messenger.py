@@ -179,21 +179,22 @@ class BacaMessengerInterface(ABC):
 
 class BacaMessenger(BacaMessengerInterface):
 
-    def __init__(self, baca_url: str, password: str, logger: Logger):
-        self.baca_url = baca_url
+    def __init__(self, baca_success_url: str, baca_failure_url: str, password: str, logger: Logger):
+        self.baca_success_url = baca_success_url
+        self.baca_failure_url = baca_failure_url
         self.password = password
         self.logger = logger
 
     async def send(self, task_submit):
         try:
-            return await self._send_to_baca(task_submit, self.baca_url, self.password)
+            return await self._send_to_baca(task_submit, self.baca_success_url, self.password)
         except Exception as e:
             self.logger.error(str(e))
             raise self.BacaMessengerError("Cannot communicate with baCa2.") from e
 
     async def send_error(self, task_submit: TaskSubmitInterface, error: Exception) -> bool:
         try:
-            return await self._send_error_to_baca(task_submit, str(error), self.baca_url, self.password)
+            return await self._send_error_to_baca(task_submit, str(error), self.baca_failure_url, self.password)
         except Exception as e:
             self.logger.error(str(e))
             return False
