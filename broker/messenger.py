@@ -45,7 +45,7 @@ class KolejkaMessenger(KolejkaMessengerInterface):
         self.submits_dir = submits_dir
         self.build_namespace = build_namespace
         self.kolejka_conf = kolejka_conf
-        self.python_call: str = 'python3' if sys.platform.startswith('win') else 'py'
+        self.python_call: str = 'py' if sys.platform.startswith('win') else 'python3'
         self.kolejka_callback_url_prefix = kolejka_callback_url_prefix
         self.logger = logger
 
@@ -76,7 +76,8 @@ class KolejkaMessenger(KolejkaMessengerInterface):
         set_id = task_submit.make_set_submit_id(task_submit.submit_id, set_submit.set_name)
         callback_url = self.kolejka_callback_url(set_id)
 
-        cmd_judge = [self.get_kolejka_judge(task_submit.package),
+        cmd_judge = [self.python_call,
+                     self.get_kolejka_judge(task_submit.package),
                      'task',
                      '--callback', callback_url,
                      '--library-path', self.get_kolejka_judge(task_submit.package),
@@ -84,33 +85,29 @@ class KolejkaMessenger(KolejkaMessengerInterface):
                      task_submit.package.build_path(self.build_namespace) / set_submit.set_name / "tests.yaml",
                      task_submit.submit_path,
                      task_dir]
-        cmd_judge = ' '.join(map(subprocess.list2cmdline, cmd_judge))
 
-        judge_future = await asyncio.create_subprocess_shell(
-            f"{self.python_call} {cmd_judge}",
-            stderr=asyncio.subprocess.PIPE
-        )
+        judge_future = await asyncio.create_subprocess_shell(subprocess.list2cmdline(cmd_judge),
+                                                             stderr=asyncio.subprocess.PIPE)
         _, stderr = await judge_future.communicate()
 
         if judge_future.returncode != 0:
             raise self.KolejkaCommunicationError(f'KOLEJKA judge failed to create task; stderr: {stderr}')
 
-        cmd_client = [self.get_kolejka_client(task_submit.package),
+        cmd_client = [self.python_call,
+                      self.get_kolejka_client(task_submit.package),
                       '--config-file', self.kolejka_conf,
                       'task', 'put',
                       task_dir]
-        cmd_client = ' '.join(map(subprocess.list2cmdline, cmd_client))
 
-        client_future = await asyncio.create_subprocess_shell(
-            f"{self.python_call} {cmd_client}",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
+        client_future = await asyncio.create_subprocess_shell(subprocess.list2cmdline(cmd_client),
+                                                              stdout=asyncio.subprocess.PIPE,
+                                                              stderr=asyncio.subprocess.PIPE)
         stdout, stderr = await client_future.communicate()
         result_code = stdout.decode('utf-8').strip()
 
         if client_future.returncode != 0:
-            raise self.KolejkaCommunicationError('KOLEJKA client failed to communicate with KOLEJKA server.')
+            raise self.KolejkaCommunicationError(f'KOLEJKA client failed to communicate with KOLEJKA server. '
+                                                 f'stderr: {stderr}')
 
         return result_code
 
@@ -185,7 +182,7 @@ class BacaMessenger(BacaMessengerInterface):
         self.password = password
         self.logger = logger
 
-    async def send(self, task_submit):
+    async def send(self, task_submit) -> int:
         try:
             return await self._send_to_baca(task_submit, self.baca_success_url, self.password)
         except Exception as e:
@@ -213,6 +210,8 @@ class BacaMessenger(BacaMessengerInterface):
 
         if status_code != 200:
             raise ConnectionError(f'Failed to send results to baCa2. Status code: {status_code}')
+
+        return status_code
 
     @staticmethod
     async def _send_error_to_baca(task_submit: TaskSubmitInterface,

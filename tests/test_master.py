@@ -60,7 +60,7 @@ class MaterTest(unittest.TestCase):
         self.package_path = self.test_dir / 'test_packages' / '1'
         self.submit_path = self.test_dir / 'test_packages' / '1' / '1' / 'prog' / 'solution.cpp'
 
-        self.logger = Logger()
+        self.logger = Logger.with_default_handlers(name="broker")
         self.data_master = DataMaster(TaskSubmit, SetSubmit)
         self.kolejka_messenger = self.KolejkaMessengerMock()
         self.baca_messenger = self.BacaMessengerMock()
