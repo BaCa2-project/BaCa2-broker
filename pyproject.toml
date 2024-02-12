@@ -1,8 +1,11 @@
 [tool.poetry]
 name = "baca2-broker"
 version = "0.1.0"
-description = ""
-authors = ["Bartosz Deptuła <barti.deptula@gmail.com>"]
+description = "Broker for BaCa2 project"
+authors = [
+    "Bartosz Deptuła <barti.deptula@gmail.com>",
+    "Mateusz Kadula <mateusz.kadula@student.uj.edu.pl>"
+]
 readme = "README.md"
 packages = [{include = "broker"}]
 
