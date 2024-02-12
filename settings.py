@@ -4,34 +4,14 @@ from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
 
-load_dotenv()
-
 from baca2PackageManager import set_base_dir, add_supported_extensions
 
-MODES = {
-    'production': {
-        'delete_records': False,
-        'verbose': True,
-        'force_rebuild': True,
-        'server_ip': 'baca2.ii.uj.edu.pl',
-        'server_port': 8180,
-        'default_timeout': timedelta(minutes=10),
-        'default_timestep': timedelta(seconds=10),
-        'active_wait': False,
-    },
-    'development': {
-        'delete_records': True,
-        'verbose': True,
-        'force_rebuild': True,
-        'default_timeout': timedelta(minutes=3),
-        'default_timestep': timedelta(seconds=2),
-        'active_wait': True,
-        'server_ip': '127.0.0.1',
-        'server_port': 8180,
-    }
-}
-APP_MODE = os.getenv('APP_MODE', 'development')
-APP_SETTINGS = MODES[APP_MODE]
+
+load_dotenv()
+
+SERVER_HOST: str = '0.0.0.0'  # 'baca2.ii.uj.edu.pl'
+SERVER_PORT: int = 8180
+KOLEJKA_CALLBACK_URL_PREFIX = f'http://{SERVER_HOST}:{SERVER_PORT}/kolejka'
 
 BASE_DIR = Path(__file__).resolve().parent
 _baca2_dir_in = os.getenv('BACA2_DIR')
@@ -58,10 +38,10 @@ JUDGES = {
     'main': JUDGES_SRC_DIR / 'judge_main.py'
 }
 
-DB_STRING = f"{BASE_DIR.absolute() / 'submit_control.db'}"
-# DB_STRING = f"sqlite://submit_control.db"
-
 BUILD_NAMESPACE = 'kolejka'
+
+TASK_SUBMIT_TIMEOUT = timedelta(minutes=10)
+DELETION_DAEMON_INTERVAL = timedelta(minutes=5)
 
 set_base_dir(PACKAGES_DIR)
 add_supported_extensions('cpp')

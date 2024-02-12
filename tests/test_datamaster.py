@@ -6,8 +6,8 @@ from pathlib import Path
 from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import BrokerToBaca
 
-from broker.datamaster import (DataMasterInterface, TaskSubmitInterface, SetSubmitInterface,
-                               DataMaster, TaskSubmit, SetSubmit)
+from app.broker.datamaster import (DataMasterInterface, TaskSubmitInterface, SetSubmitInterface,
+                                   DataMaster, TaskSubmit, SetSubmit)
 
 
 class DatamasterTest(unittest.TestCase):

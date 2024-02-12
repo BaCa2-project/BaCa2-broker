@@ -4,18 +4,16 @@ from baca2PackageManager.broker_communication import BacaToBroker, make_hash
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
+import settings
 from aiologger import Logger
-from settings import (BROKER_PASSWORD, SUBMITS_DIR, BUILD_NAMESPACE, KOLEJKA_CONF, KOLEJKA_CALLBACK_URL_PREFIX,
-                      BACA_RESULTS_URL, BACA_ERROR_URL, BACA_PASSWORD, KOLEJKA_SRC_DIR, TASK_SUBMIT_TIMEOUT,
-                      DELETION_DAEMON_INTERVAL)
 
-from .master import BrokerMaster
-from .datamaster import DataMaster, SetSubmit, TaskSubmit
-from .messenger import KolejkaMessenger, BacaMessenger, PackageManager
+from .broker.master import BrokerMaster
+from .broker.datamaster import DataMaster, SetSubmit, TaskSubmit
+from .broker.messenger import KolejkaMessenger, BacaMessenger, PackageManager
 
 
 logger = Logger.with_default_handlers(name="broker")
-broker_password = BROKER_PASSWORD
+broker_password = settings.BROKER_PASSWORD
 
 data_master = DataMaster(
     task_submit_t=TaskSubmit,
@@ -23,23 +21,23 @@ data_master = DataMaster(
 )
 
 kolejka_messanger = KolejkaMessenger(
-    submits_dir=SUBMITS_DIR,
-    build_namespace=BUILD_NAMESPACE,
-    kolejka_conf=KOLEJKA_CONF,
-    kolejka_callback_url_prefix=KOLEJKA_CALLBACK_URL_PREFIX,
+    submits_dir=settings.SUBMITS_DIR,
+    build_namespace=settings.BUILD_NAMESPACE,
+    kolejka_conf=settings.KOLEJKA_CONF,
+    kolejka_callback_url_prefix=settings.KOLEJKA_CALLBACK_URL_PREFIX,
     logger=logger
 )
 
 baca_messanger = BacaMessenger(
-    baca_success_url=BACA_RESULTS_URL,
-    baca_failure_url=BACA_ERROR_URL,
-    password=BACA_PASSWORD,
+    baca_success_url=settings.BACA_RESULTS_URL,
+    baca_failure_url=settings.BACA_ERROR_URL,
+    password=settings.BACA_PASSWORD,
     logger=logger
 )
 
 package_manager = PackageManager(
-    kolejka_src_dir=KOLEJKA_SRC_DIR,
-    build_namespace=BUILD_NAMESPACE,
+    kolejka_src_dir=settings.KOLEJKA_SRC_DIR,
+    build_namespace=settings.BUILD_NAMESPACE,
     force_rebuild=False,
 )
 
@@ -57,8 +55,8 @@ background = set()
 
 @app.on_event("startup")
 async def start_daemons():
-    task = asyncio.create_task(data_master.start_daemons(task_submit_timeout=TASK_SUBMIT_TIMEOUT,
-                                                         interval=DELETION_DAEMON_INTERVAL))
+    task = asyncio.create_task(data_master.start_daemons(task_submit_timeout=settings.TASK_SUBMIT_TIMEOUT,
+                                                         interval=settings.DELETION_DAEMON_INTERVAL))
     background.add(task)
 
 

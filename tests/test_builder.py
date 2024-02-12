@@ -1,6 +1,7 @@
 from unittest import TestCase
-from broker.builder import *
 from baca2PackageManager import *
+
+from app.broker.builder import Builder
 from settings import BASE_DIR
 
 set_base_dir(BASE_DIR / 'tests' / 'test_packages')

@@ -10,9 +10,9 @@ from fastapi import FastAPI, HTTPException
 import uvicorn
 from aiologger import Logger
 
-from broker.messenger import BacaMessenger, KolejkaMessenger, PackageManager
-from broker.datamaster import TaskSubmitInterface, SetSubmitInterface, TaskSubmit, DataMaster, SetSubmit
-from settings import SUBMITS_DIR, BUILD_NAMESPACE, KOLEJKA_CONF, KOLEJKA_CALLBACK_URL_PREFIX, KOLEJKA_SRC_DIR
+from app.broker.messenger import BacaMessenger, KolejkaMessenger, PackageManager
+from app.broker.datamaster import TaskSubmitInterface, SetSubmitInterface, TaskSubmit, DataMaster, SetSubmit
+from settings import SUBMITS_DIR, BUILD_NAMESPACE, KOLEJKA_CONF, KOLEJKA_SRC_DIR
 
 app = FastAPI()
 

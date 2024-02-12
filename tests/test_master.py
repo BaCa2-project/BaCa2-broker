@@ -6,9 +6,9 @@ from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import SetResult, BacaToBroker
 from aiologger import Logger
 
-from broker.master import BrokerMaster
-from broker.datamaster import DataMaster, SetSubmit, TaskSubmit, SetSubmitInterface, TaskSubmitInterface
-from broker.messenger import KolejkaMessengerInterface, BacaMessengerInterface, PackageManagerInterface
+from app.broker import BrokerMaster
+from app.broker.datamaster import DataMaster, SetSubmit, TaskSubmit, SetSubmitInterface, TaskSubmitInterface
+from app.broker.messenger import KolejkaMessengerInterface, BacaMessengerInterface, PackageManagerInterface
 
 
 class MaterTest(unittest.TestCase):
