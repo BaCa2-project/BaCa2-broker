@@ -50,14 +50,21 @@ master = BrokerMaster(
 )
 
 app = FastAPI()
-background = set()
+daemons = set()
 
 
 @app.on_event("startup")
 async def start_daemons():
     task = asyncio.create_task(data_master.start_daemons(task_submit_timeout=settings.TASK_SUBMIT_TIMEOUT,
                                                          interval=settings.DELETION_DAEMON_INTERVAL))
-    background.add(task)
+    daemons.add(task)
+
+
+@app.on_event("shutdown")
+async def stop_daemons():
+    for task in daemons:
+        task.cancel()
+    await asyncio.gather(*daemons, return_exceptions=True)
 
 
 class Content(BaseModel):
