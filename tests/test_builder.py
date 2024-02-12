@@ -1,8 +1,9 @@
 from unittest import TestCase
+
 from baca2PackageManager import *
+from settings import BASE_DIR
 
 from app.broker.builder import Builder
-from settings import BASE_DIR
 
 set_base_dir(BASE_DIR / 'tests' / 'test_packages')
 add_supported_extensions('cpp')

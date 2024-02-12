@@ -1,11 +1,10 @@
 import asyncio
 
-from baca2PackageManager.broker_communication import BacaToBroker, make_hash
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from pydantic import BaseModel
-
-import settings
 from aiologger import Logger
+from baca2PackageManager.broker_communication import BacaToBroker, make_hash
+import settings
 
 from .broker.master import BrokerMaster
 from .broker.datamaster import DataMaster, SetSubmit, TaskSubmit
@@ -13,7 +12,6 @@ from .broker.messenger import KolejkaMessenger, BacaMessenger, PackageManager
 
 
 logger = Logger.with_default_handlers(name="broker")
-broker_password = settings.BROKER_PASSWORD
 
 data_master = DataMaster(
     task_submit_t=TaskSubmit,
@@ -98,7 +96,7 @@ async def baca_post(content: Content, background_tasks: BackgroundTasks):
                        content.commit_id,
                        content.submit_path)
 
-    if make_hash(broker_password, btb.submit_id) != btb.pass_hash:
+    if make_hash(settings.BROKER_PASSWORD, btb.submit_id) != btb.pass_hash:
         raise HTTPException(status_code=401, detail="Wrong Password")
 
     background_tasks.add_task(master.handle_baca, btb)

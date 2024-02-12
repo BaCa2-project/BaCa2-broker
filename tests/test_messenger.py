@@ -4,15 +4,15 @@ from pathlib import Path
 from threading import Thread
 from time import sleep
 
-from baca2PackageManager import Package
-from baca2PackageManager.broker_communication import BrokerToBaca
 from fastapi import FastAPI, HTTPException
 import uvicorn
 from aiologger import Logger
+from baca2PackageManager import Package
+from baca2PackageManager.broker_communication import BrokerToBaca
+from settings import SUBMITS_DIR, BUILD_NAMESPACE, KOLEJKA_CONF, KOLEJKA_SRC_DIR
 
 from app.broker.messenger import BacaMessenger, KolejkaMessenger, PackageManager
 from app.broker.datamaster import TaskSubmitInterface, SetSubmitInterface, TaskSubmit, DataMaster, SetSubmit
-from settings import SUBMITS_DIR, BUILD_NAMESPACE, KOLEJKA_CONF, KOLEJKA_SRC_DIR
 
 app = FastAPI()
 
