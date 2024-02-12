@@ -1,6 +1,6 @@
 import asyncio
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from enum import Enum
 from pathlib import Path
@@ -222,6 +222,9 @@ class DataMasterInterface(ABC):
     def get_task_submit(self, submit_id: str) -> TaskSubmitInterface:
         pass
 
+    async def start_daemons(self, *args, **kwargs):
+        pass
+
 
 class DataMaster(DataMasterInterface):
 
@@ -271,3 +274,22 @@ class DataMaster(DataMasterInterface):
         if submit_id not in self.task_submits:
             raise self.DataMasterError(f"Task submit {submit_id} does not exist")
         return self.task_submits[submit_id]
+
+    async def deletion_daemon_body(self, task_submit_timeout: timedelta):
+        to_be_deleted = []
+        for task_submit in self.task_submits.values():
+            if task_submit.mod_date - task_submit.creation_date >= task_submit_timeout:
+                to_be_deleted.append(task_submit)
+
+        for task_submit in to_be_deleted:
+            task_submit.change_state(task_submit.TaskState.ERROR)
+            # TODO: log
+            self.delete_task_submit(task_submit)
+
+    async def deletion_daemon(self, task_submit_timeout: timedelta, interval: int):
+        while True:
+            await self.deletion_daemon_body(task_submit_timeout)
+            await asyncio.sleep(interval)
+
+    async def start_daemons(self, task_submit_timeout: timedelta, interval: int):
+        await asyncio.gather(self.deletion_daemon(task_submit_timeout, interval))

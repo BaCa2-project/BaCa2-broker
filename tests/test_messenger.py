@@ -120,7 +120,7 @@ class KolejkaMessengerTest(unittest.TestCase):
                                                        commit_id="1",
                                                        submit_path=self.submit_path)
         asyncio.run(task_submit.initialise())
-        self.package_manager.build_package(task_submit.package)
+        asyncio.run(self.package_manager.build_package(task_submit.package))
         set_submit = task_submit.set_submits[0]
         status_code = asyncio.run(self.kolejka_messanger.send(set_submit))
         print(status_code)
@@ -131,7 +131,7 @@ class KolejkaMessengerTest(unittest.TestCase):
                                                        commit_id="1",
                                                        submit_path=self.submit_path)
         asyncio.run(task_submit.initialise())
-        self.package_manager.build_package(task_submit.package)
+        asyncio.run(self.package_manager.build_package(task_submit.package))
         set_submit = task_submit.set_submits[0]
         status_code = asyncio.run(self.kolejka_messanger.send(set_submit))
         sleep(20)

@@ -1,10 +1,13 @@
+import asyncio
+
 from baca2PackageManager.broker_communication import BacaToBroker, make_hash
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
 from aiologger import Logger
 from settings import (BROKER_PASSWORD, SUBMITS_DIR, BUILD_NAMESPACE, KOLEJKA_CONF, KOLEJKA_CALLBACK_URL_PREFIX,
-                      BACA_RESULTS_URL, BACA_ERROR_URL, BACA_PASSWORD, KOLEJKA_SRC_DIR)
+                      BACA_RESULTS_URL, BACA_ERROR_URL, BACA_PASSWORD, KOLEJKA_SRC_DIR, TASK_SUBMIT_TIMEOUT,
+                      DELETION_DAEMON_INTERVAL)
 
 from .master import BrokerMaster
 from .datamaster import DataMaster, SetSubmit, TaskSubmit
@@ -49,6 +52,14 @@ master = BrokerMaster(
 )
 
 app = FastAPI()
+background = set()
+
+
+@app.on_event("startup")
+async def start_daemons():
+    task = asyncio.create_task(data_master.start_daemons(task_submit_timeout=TASK_SUBMIT_TIMEOUT,
+                                                         interval=DELETION_DAEMON_INTERVAL))
+    background.add(task)
 
 
 class Content(BaseModel):
