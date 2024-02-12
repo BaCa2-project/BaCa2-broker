@@ -7,7 +7,7 @@ authors = [
     "Mateusz Kadula <mateusz.kadula@student.uj.edu.pl>"
 ]
 readme = "README.md"
-packages = [{include = "broker"}]
+packages = [{include = "app"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
