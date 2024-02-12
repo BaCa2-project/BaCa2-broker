@@ -6,11 +6,12 @@ from dotenv import load_dotenv
 
 from baca2PackageManager import set_base_dir, add_supported_extensions
 
-
 load_dotenv()
+
 
 SERVER_HOST: str = '0.0.0.0'  # 'baca2.ii.uj.edu.pl'
 SERVER_PORT: int = 8180
+
 KOLEJKA_CALLBACK_URL_PREFIX = f'http://{SERVER_HOST}:{SERVER_PORT}/kolejka'
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -47,10 +48,6 @@ set_base_dir(PACKAGES_DIR)
 add_supported_extensions('cpp')
 
 BACA_URL = os.getenv('BACA_URL')
-# Number of tries to send a submit results back to BaCa2
-BACA_SEND_TRIES = 1
-# Interval between tries to send a submit results back to BaCa2
-BACA_SEND_INTERVAL = 0.4
 
 # Where results should be sent back to BaCa2
 BACA_RESULTS_URL = f'{BACA_URL}/result'
@@ -61,6 +58,3 @@ BACA_ERROR_URL = f'{BACA_URL}/error'
 # PASSWORDS HAVE TO DIFFERENT IN ORDER TO BE EFFECTIVE
 BACA_PASSWORD = os.getenv('BACA_PASSWORD')
 BROKER_PASSWORD = os.getenv('BROKER_PASSWORD')
-
-DB_USER = os.getenv('DB_USER')
-DB_PASSWORD = os.getenv('DB_PASSWORD')
