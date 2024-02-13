@@ -127,10 +127,9 @@ class KolejkaMessenger(KolejkaMessengerInterface):
                       'result', 'get',
                       result_code,
                       result_dir]
-        result_get = ' '.join(map(subprocess.list2cmdline, result_get))
 
         result_future = await asyncio.create_subprocess_shell(
-            f'{self.python_call} {result_get}',
+            subprocess.list2cmdline(result_get),
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL
         )
