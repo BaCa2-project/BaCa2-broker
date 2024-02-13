@@ -99,6 +99,15 @@ class KolejkaMessenger(KolejkaMessengerInterface):
                       'task', 'put',
                       task_dir]
 
+        cmd_client_active_wait = [
+            self.python_call,
+            self.get_kolejka_client(task_submit.package),
+            '--config-file', self.kolejka_conf,
+            'execute',
+            task_dir,
+            #result_dir <- this is the directory where the results will be stored
+        ]
+
         client_future = await asyncio.create_subprocess_shell(subprocess.list2cmdline(cmd_client),
                                                               stdout=asyncio.subprocess.PIPE,
                                                               stderr=asyncio.subprocess.PIPE)
