@@ -94,12 +94,12 @@ class BacaMessengerTest(unittest.TestCase):
 
 class KolejkaMessengerTest(unittest.TestCase):
 
-    test_dir = Path(__file__).parent
+    test_dir = Path(__file__).parent.parent
 
     def setUp(self):
         self.data_master = DataMaster(TaskSubmit, SetSubmit)
-        self.package_path = self.test_dir / 'test_packages' / '1'
-        self.submit_path = self.test_dir / 'test_packages' / '1' / '1' / 'prog' / 'solution.cpp'
+        self.package_path = self.test_dir / 'resources' / '1'
+        self.submit_path = self.test_dir / 'resources' / '1' / '1' / 'prog' / 'solution.cpp'
         self.kolejka_messanger = KolejkaMessenger(
             submits_dir=SUBMITS_DIR,
             build_namespace=BUILD_NAMESPACE,
