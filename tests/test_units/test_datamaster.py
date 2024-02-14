@@ -119,12 +119,12 @@ class DatamasterTest(unittest.TestCase):
 
 class SubmitsTest(unittest.TestCase):
 
-    test_dir = Path(__file__).absolute().parent
+    test_dir = Path(__file__).absolute().parent.parent
 
     def setUp(self):
         self.data_master = DataMaster(TaskSubmit, SetSubmit)
-        package_path = self.test_dir / 'test_packages' / '1'
-        submit_path = self.test_dir / 'test_packages' / '1' / '1' / 'prog' / 'solution.cpp'
+        package_path = self.test_dir / 'resources' / '1'
+        submit_path = self.test_dir / 'resources' / '1' / '1' / 'prog' / 'solution.cpp'
         self.task_submit = self.data_master.new_task_submit("submit_id", package_path,
                                                             "1", submit_path)
 

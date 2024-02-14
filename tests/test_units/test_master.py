@@ -13,7 +13,7 @@ from app.broker.messenger import KolejkaMessengerInterface, BacaMessengerInterfa
 
 class MaterTest(unittest.TestCase):
 
-    test_dir = Path(__file__).parent
+    test_dir = Path(__file__).parent.parent
 
     class KolejkaMessengerMock(KolejkaMessengerInterface):
 
@@ -21,17 +21,17 @@ class MaterTest(unittest.TestCase):
             super().__init__(*args, **kwargs)
             self.raise_exception = False
 
-        async def get_results(self, set_submit: SetSubmitInterface, result_code: str) -> SetResult:
+        async def get_results(self, set_submit: SetSubmitInterface) -> SetResult:
             await asyncio.sleep(0)
             if self.raise_exception:
                 raise Exception
             return SetResult(name='x', tests=[])
 
-        async def send(self, set_submit: SetSubmitInterface) -> str:
+        async def send(self, set_submit: SetSubmitInterface):
             await asyncio.sleep(0)
             if self.raise_exception:
                 raise Exception
-            return '200'
+            set_submit.set_status_code('200')
 
     class BacaMessengerMock(BacaMessengerInterface):
 
@@ -57,8 +57,8 @@ class MaterTest(unittest.TestCase):
             await asyncio.sleep(0)
 
     def setUp(self):
-        self.package_path = self.test_dir / 'test_packages' / '1'
-        self.submit_path = self.test_dir / 'test_packages' / '1' / '1' / 'prog' / 'solution.cpp'
+        self.package_path = self.test_dir / 'resources' / '1'
+        self.submit_path = self.test_dir / 'resources' / '1' / '1' / 'prog' / 'solution.cpp'
 
         self.logger = Logger.with_default_handlers(name="broker")
         self.data_master = DataMaster(TaskSubmit, SetSubmit)
@@ -97,6 +97,7 @@ class MaterTest(unittest.TestCase):
         task_submit = self.data_master.task_submits['submit1']
         self.assertEqual(task_submit.state, TaskSubmit.TaskState.AWAITING_SETS)
         for set_submit in task_submit.set_submits:
+            self.assertEqual(set_submit.get_status_code(), '200')
             set_id = task_submit.make_set_submit_id(task_submit.submit_id, set_submit.set_name)
             asyncio.run(self.master.handle_kolejka(set_id))
             self.assertEqual(set_submit.state, SetSubmit.SetState.DONE)

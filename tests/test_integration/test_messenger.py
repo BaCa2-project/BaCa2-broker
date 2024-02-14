@@ -115,7 +115,7 @@ class KolejkaMessengerTest(unittest.TestCase):
         self.package_manager.refresh_kolejka_src()
 
     def test_send_kolejka(self):  # TODO finish this test
-        task_submit = self.data_master.new_task_submit(task_submit_id="submit_id",
+        task_submit = self.data_master.new_task_submit(task_submit_id="1",
                                                        package_path=self.package_path,
                                                        commit_id="1",
                                                        submit_path=self.submit_path)
@@ -135,7 +135,7 @@ class KolejkaMessengerTest(unittest.TestCase):
         set_submit = task_submit.set_submits[0]
         status_code = asyncio.run(self.kolejka_messanger.send(set_submit))
         sleep(20)
-        self.kolejka_messanger.get_results(set_submit, status_code)
+        self.kolejka_messanger.get_results(set_submit)
 
 
 if __name__ == '__main__':
