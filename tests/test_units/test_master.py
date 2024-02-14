@@ -1,10 +1,10 @@
 import asyncio
+import logging
 import unittest
 from pathlib import Path
 
 from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import SetResult, BacaToBroker
-from aiologger import Logger
 
 from app.broker import BrokerMaster
 from app.broker.datamaster import DataMaster, SetSubmit, TaskSubmit, SetSubmitInterface, TaskSubmitInterface
@@ -60,8 +60,9 @@ class MaterTest(unittest.TestCase):
         self.package_path = self.test_dir / 'resources' / '1'
         self.submit_path = self.test_dir / 'resources' / '1' / '1' / 'prog' / 'solution.cpp'
 
-        self.logger = Logger.with_default_handlers(name="broker")
-        self.data_master = DataMaster(TaskSubmit, SetSubmit)
+        self.logger = logging.Logger('test')
+        self.logger.addHandler(logging.StreamHandler())
+        self.data_master = DataMaster(TaskSubmit, SetSubmit, self.logger)
         self.kolejka_messenger = self.KolejkaMessengerMock()
         self.baca_messenger = self.BacaMessengerMock()
         self.package_manager = self.PackageManagerMock(force_rebuild=False)

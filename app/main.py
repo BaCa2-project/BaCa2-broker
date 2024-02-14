@@ -1,8 +1,8 @@
 import asyncio
+import logging
 
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from pydantic import BaseModel
-from aiologger import Logger
 from baca2PackageManager.broker_communication import BacaToBroker, make_hash
 import settings
 
@@ -11,11 +11,12 @@ from .broker.datamaster import DataMaster, SetSubmit, TaskSubmit
 from .broker.messenger import KolejkaMessenger, BacaMessenger, PackageManager
 
 
-logger = Logger.with_default_handlers(name="broker")
+logger = logging.Logger(__name__)
 
 data_master = DataMaster(
     task_submit_t=TaskSubmit,
-    set_submit_t=SetSubmit
+    set_submit_t=SetSubmit,
+    logger=logger
 )
 
 kolejka_messanger = KolejkaMessenger(

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import unittest
 from datetime import timedelta
 from pathlib import Path
@@ -56,7 +57,9 @@ class DatamasterTest(unittest.TestCase):
             return [s.get_result() for s in self.set_submits]
 
     def setUp(self):
-        self.data_master = DataMaster(self.TaskSubmitMock, SetSubmit)
+        self.logger = logging.Logger('test')
+        self.logger.addHandler(logging.StreamHandler())
+        self.data_master = DataMaster(self.TaskSubmitMock, SetSubmit, self.logger)
 
     def test_new_task_submit(self):
         task_submit = self.data_master.new_task_submit("submit_id", Path("package_path"),
@@ -122,7 +125,9 @@ class SubmitsTest(unittest.TestCase):
     test_dir = Path(__file__).absolute().parent.parent
 
     def setUp(self):
-        self.data_master = DataMaster(TaskSubmit, SetSubmit)
+        self.logger = logging.Logger('test')
+        self.logger.addHandler(logging.StreamHandler())
+        self.data_master = DataMaster(TaskSubmit, SetSubmit, self.logger)
         package_path = self.test_dir / 'resources' / '1'
         submit_path = self.test_dir / 'resources' / '1' / '1' / 'prog' / 'solution.cpp'
         self.task_submit = self.data_master.new_task_submit("submit_id", package_path,

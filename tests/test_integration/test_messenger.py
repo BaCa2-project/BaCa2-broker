@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import unittest
 from pathlib import Path
 from threading import Thread
@@ -6,7 +7,6 @@ from time import sleep
 
 from fastapi import FastAPI, HTTPException
 import uvicorn
-from aiologger import Logger
 from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import BrokerToBaca
 from settings import SUBMITS_DIR, BUILD_NAMESPACE, KOLEJKA_CONF, KOLEJKA_SRC_DIR
@@ -71,11 +71,13 @@ class BacaMessengerTest(unittest.TestCase):
         sleep(0.2)
 
     def setUp(self):
+        self.logger = logging.Logger('test')
+        self.logger.addHandler(logging.StreamHandler())
         self.baca_messenger = BacaMessenger(
             baca_success_url="http://localhost:8000/success",
             baca_failure_url="http://localhost:8000/failure",
             password="password",
-            logger=Logger.with_default_handlers(name="broker")
+            logger=self.logger
         )
 
     def test_baca_send(self):
@@ -97,7 +99,9 @@ class KolejkaMessengerTest(unittest.TestCase):
     test_dir = Path(__file__).parent.parent
 
     def setUp(self):
-        self.data_master = DataMaster(TaskSubmit, SetSubmit)
+        self.logger = logging.Logger('test')
+        self.logger.addHandler(logging.StreamHandler())
+        self.data_master = DataMaster(TaskSubmit, SetSubmit, self.logger)
         self.package_path = self.test_dir / 'resources' / '1'
         self.submit_path = self.test_dir / 'resources' / '1' / '1' / 'prog' / 'solution.cpp'
         self.kolejka_messanger = KolejkaMessenger(
@@ -105,7 +109,7 @@ class KolejkaMessengerTest(unittest.TestCase):
             build_namespace=BUILD_NAMESPACE,
             kolejka_conf=KOLEJKA_CONF,
             kolejka_callback_url_prefix='http://127.0.0.1/',
-            logger=Logger.with_default_handlers(name="broker")
+            logger=self.logger
         )
         self.package_manager = PackageManager(
             kolejka_src_dir=KOLEJKA_SRC_DIR,
@@ -133,7 +137,7 @@ class KolejkaMessengerTest(unittest.TestCase):
         asyncio.run(task_submit.initialise())
         asyncio.run(self.package_manager.build_package(task_submit.package))
         set_submit = task_submit.set_submits[0]
-        status_code = asyncio.run(self.kolejka_messanger.send(set_submit))
+        asyncio.run(self.kolejka_messanger.send(set_submit))
         sleep(20)
         self.kolejka_messanger.get_results(set_submit)
 

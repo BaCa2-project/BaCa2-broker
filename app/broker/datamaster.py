@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import Optional
@@ -38,6 +39,8 @@ class SetSubmitInterface(ABC):
     def change_state(self, new_state: SetState, requires: SetState | list[SetState] | None):
         if requires is not None:
             self.requires(requires)
+        self.master.logger.log(logging.INFO, "State of set_submit '%s': %s -> %s",
+                               self.submit_id, self.state.name, new_state.name)
         self.mod_date = datetime.now()
         self.state = new_state
 
@@ -45,7 +48,7 @@ class SetSubmitInterface(ABC):
         if isinstance(states, self.SetState):
             states = [states]
         if self.state not in states:
-            raise StateError(f"State {self.state} not in {states}")
+            raise StateError(f"Any of {states} is required, but state is {self.state}")
 
     @property
     def submit_id(self) -> str:
@@ -124,6 +127,8 @@ class TaskSubmitInterface(ABC):
     def change_state(self, new_state: TaskState, requires: TaskState | list[TaskState] | None):
         if requires is not None:
             self.requires(requires)
+        self.master.logger.log(logging.INFO, "State of task_submit '%s': %s -> %s",
+                               self.submit_id, self.state.name, new_state.name)
         self.mod_date = datetime.now()
         self.state = new_state
 
@@ -131,7 +136,7 @@ class TaskSubmitInterface(ABC):
         if isinstance(states, self.TaskState):
             states = [states]
         if self.state not in states:
-            raise StateError(f"State {self.state} not in {states}")
+            raise StateError(f"Any of {states} is required, but state is {self.state}")
 
     def change_set_states(self, new_state: SetSubmit.SetState,
                           requires: SetSubmit.SetState | list[SetSubmit.SetState] | None):
@@ -222,9 +227,13 @@ class DataMasterInterface(ABC):
     class DataMasterError(Exception):
         pass
 
-    def __init__(self, task_submit_t: type[TaskSubmitInterface], set_submit_t: type[SetSubmitInterface]):
+    def __init__(self,
+                 task_submit_t: type[TaskSubmitInterface],
+                 set_submit_t: type[SetSubmitInterface],
+                 logger: logging.Logger):
         self.task_submit_t = task_submit_t
         self.set_submit_t = set_submit_t
+        self.logger = logger
 
     @abstractmethod
     def new_set_submit(self, task_submit: 'TaskSubmitInterface', set_name: str) -> SetSubmitInterface:
@@ -256,8 +265,11 @@ class DataMasterInterface(ABC):
 
 class DataMaster(DataMasterInterface):
 
-    def __init__(self, task_submit_t: type[TaskSubmitInterface], set_submit_t: type[SetSubmitInterface]):
-        super().__init__(task_submit_t, set_submit_t)
+    def __init__(self,
+                 task_submit_t: type[TaskSubmitInterface],
+                 set_submit_t: type[SetSubmitInterface],
+                 logger: logging.Logger):
+        super().__init__(task_submit_t, set_submit_t, logger)
         self.task_submits: dict[str, TaskSubmit] = {}
         self.set_submits: dict[str, SetSubmit] = {}
 

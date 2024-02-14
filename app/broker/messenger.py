@@ -7,11 +7,11 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 import asyncio
 from pathlib import Path
+import logging
 
 import requests
 import yaml
 import aiohttp
-from aiologger import Logger
 from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import BrokerToBaca, make_hash, BrokerToBacaError, SetResult, TestResult
 
@@ -41,7 +41,7 @@ class KolejkaMessenger(KolejkaMessengerInterface):
                  build_namespace: str,
                  kolejka_conf: Path,
                  kolejka_callback_url_prefix: str,
-                 logger: Logger):
+                 logger: logging.Logger):
         self.submits_dir = submits_dir
         self.build_namespace = build_namespace
         self.kolejka_conf = kolejka_conf
@@ -115,7 +115,7 @@ class KolejkaMessenger(KolejkaMessengerInterface):
         try:
             return await self._get_results_inner(set_submit, set_submit.get_status_code())
         except Exception as e:
-            await self.logger.error(str(e))
+            self.logger.error(str(e))
             raise self.KolejkaCommunicationError("Cannot communicate with KOLEJKA.") from e
 
     async def _get_results_inner(self, set_submit: SetSubmitInterface, result_code: str) -> SetResult:
@@ -240,7 +240,7 @@ class BacaMessengerInterface(ABC):
 
 class BacaMessenger(BacaMessengerInterface):
 
-    def __init__(self, baca_success_url: str, baca_failure_url: str, password: str, logger: Logger):
+    def __init__(self, baca_success_url: str, baca_failure_url: str, password: str, logger: logging.Logger):
         self.baca_success_url = baca_success_url
         self.baca_failure_url = baca_failure_url
         self.password = password
