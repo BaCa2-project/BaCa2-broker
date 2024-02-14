@@ -7,7 +7,7 @@ from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import BrokerToBaca
 
 from app.broker.datamaster import (DataMasterInterface, TaskSubmitInterface, SetSubmitInterface,
-                                   DataMaster, TaskSubmit, SetSubmit)
+                                   DataMaster, TaskSubmit, SetSubmit, StateError)
 
 
 class DatamasterTest(unittest.TestCase):
@@ -134,26 +134,31 @@ class SubmitsTest(unittest.TestCase):
         self.assertEqual(len(self.data_master.task_submits), 1)
         self.assertEqual(len(self.task_submit.set_submits), 3)
 
-    def test_change_state_task_submit(self):
-        self.task_submit.change_state(TaskSubmit.TaskState.AWAITING_SETS)
-        self.assertEqual(self.task_submit.state, TaskSubmit.TaskState.AWAITING_SETS)
-        self.task_submit.change_state(TaskSubmit.TaskState.DONE)
-        self.assertEqual(self.task_submit.state, TaskSubmit.TaskState.DONE)
-
     def test_change_state_set_submit(self):
         asyncio.run(self.task_submit.initialise())
         set_submit = self.task_submit.set_submits[0]
-
-        async def run():
-            t3 = asyncio.create_task(set_submit.change_state(SetSubmit.SetState.DONE, timeout=None))
-            await asyncio.sleep(0)
-            t2 = asyncio.create_task(set_submit.change_state(SetSubmit.SetState.AWAITING_KOLEJKA, timeout=None))
-            await asyncio.sleep(0)
-            t1 = asyncio.create_task(set_submit.change_state(SetSubmit.SetState.SENDING_TO_KOLEJKA))
-            await asyncio.gather(t1, t2, t3)
-
-        asyncio.run(run())
+        set_submit.change_state(SetSubmit.SetState.SENDING_TO_KOLEJKA, requires=SetSubmit.SetState.INITIAL)
+        self.assertEqual(set_submit.state, SetSubmit.SetState.SENDING_TO_KOLEJKA)
+        with self.assertRaises(StateError):
+            set_submit.change_state(SetSubmit.SetState.DONE, requires=SetSubmit.SetState.INITIAL)
+        set_submit.change_state(SetSubmit.SetState.DONE, requires=SetSubmit.SetState.SENDING_TO_KOLEJKA)
         self.assertEqual(set_submit.state, SetSubmit.SetState.DONE)
+        set_submit.change_state(SetSubmit.SetState.INITIAL, None)
+        self.assertEqual(set_submit.state, SetSubmit.SetState.INITIAL)
+        set_submit.change_state(SetSubmit.SetState.SENDING_TO_KOLEJKA,
+                                requires=[SetSubmit.SetState.INITIAL, SetSubmit.SetState.DONE])
+        self.assertEqual(set_submit.state, SetSubmit.SetState.SENDING_TO_KOLEJKA)
+
+    def test_change_state_task_submit(self):
+        with self.assertRaises(StateError):
+            self.task_submit.change_state(TaskSubmit.TaskState.DONE, requires=TaskSubmit.TaskState.AWAITING_SETS)
+        self.task_submit.change_state(TaskSubmit.TaskState.AWAITING_SETS, requires=TaskSubmit.TaskState.INITIAL)
+        self.assertEqual(self.task_submit.state, TaskSubmit.TaskState.AWAITING_SETS)
+        self.task_submit.change_state(TaskSubmit.TaskState.DONE,
+                                      requires=[TaskSubmit.TaskState.AWAITING_SETS, TaskSubmit.TaskState.ERROR])
+        self.assertEqual(self.task_submit.state, TaskSubmit.TaskState.DONE)
+        self.task_submit.change_state(TaskSubmit.TaskState.INITIAL, None)
+        self.assertEqual(self.task_submit.state, TaskSubmit.TaskState.INITIAL)
 
     def test_set_results(self):
         asyncio.run(self.task_submit.initialise())
@@ -175,10 +180,8 @@ class SubmitsTest(unittest.TestCase):
         self.assertRaises(ValueError, lambda: self.task_submit.results)
         result = BrokerToBaca("submit_id", "hash", "package_path")
         for set_submit in self.task_submit.set_submits:
-            asyncio.run(set_submit.change_state(SetSubmit.SetState.SENDING_TO_KOLEJKA, timeout=0))
-            asyncio.run(set_submit.change_state(SetSubmit.SetState.AWAITING_KOLEJKA, timeout=0))
+            set_submit.change_state(SetSubmit.SetState.DONE, requires=None)
             set_submit.set_result(result)
-            asyncio.run(set_submit.change_state(SetSubmit.SetState.DONE, timeout=0))
         self.assertEqual(self.task_submit.results, [result, result, result])
 
 

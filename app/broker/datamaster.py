@@ -9,6 +9,10 @@ from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import BrokerToBaca
 
 
+class StateError(Exception):
+    pass
+
+
 class SetSubmitInterface(ABC):
 
     class SetState(Enum):
@@ -24,21 +28,27 @@ class SetSubmitInterface(ABC):
         self.master = master
         self.task_submit = task_submit
         self.state: SetSubmitInterface.SetState = SetSubmitInterface.SetState.INITIAL
-        self.set_name = set_name
         self.creation_date = datetime.now()
         self.mod_date = self.creation_date
-        self.state_event = asyncio.Event()
+        self.lock = asyncio.Lock()
+        # data fields
+        self.set_name = set_name
 
-    async def change_state(self, new_state: SetState, timeout: int | None = None):
-        while new_state.value - self.state.value != 1 and new_state.value >= 0:
-            self.state_event.clear()
-            await asyncio.wait_for(self.state_event.wait(), timeout)
+    def change_state(self, new_state: SetState, requires: SetState | list[SetState] | None):
+        if requires is not None:
+            self.requires(requires)
         self.mod_date = datetime.now()
         self.state = new_state
-        self.state_event.set()
 
-    def is_active(self) -> bool:
-        return self.state in [self.SetState.AWAITING_KOLEJKA, self.SetState.SENDING_TO_KOLEJKA]
+    def requires(self, states: SetState | list[SetState]):
+        if isinstance(states, self.SetState):
+            states = [states]
+        if self.state not in states:
+            raise StateError(f"State {self.state} not in {states}")
+
+    @property
+    def submit_id(self) -> str:
+        return self.task_submit.make_set_submit_id(self.task_submit.submit_id, self.set_name)
 
     @abstractmethod
     def set_result(self, result: BrokerToBaca):
@@ -99,17 +109,28 @@ class TaskSubmitInterface(ABC):
                  commit_id: str,
                  submit_path: Path):
         self.master = master
-        self.submit_id = task_submit_id
         self.state: TaskSubmitInterface.TaskState = TaskSubmitInterface.TaskState.INITIAL
+        self.creation_date = datetime.now()
+        self.mod_date = self.creation_date
+        self.state_event = asyncio.Event()
+        self.lock = asyncio.Lock()
+        # data fields
+        self.submit_id = task_submit_id
         self.package_path = package_path
         self.commit_id = commit_id
         self.submit_path = submit_path
-        self.creation_date = datetime.now()
-        self.mod_date = self.creation_date
 
-    def change_state(self, new_state: TaskState):
+    def change_state(self, new_state: TaskState, requires: TaskState | list[TaskState] | None):
+        if requires is not None:
+            self.requires(requires)
         self.mod_date = datetime.now()
         self.state = new_state
+
+    def requires(self, states: TaskState | list[TaskState]):
+        if isinstance(states, self.TaskState):
+            states = [states]
+        if self.state not in states:
+            raise StateError(f"State {self.state} not in {states}")
 
     @staticmethod
     @abstractmethod
@@ -157,13 +178,14 @@ class TaskSubmit(TaskSubmitInterface):
         return f"{task_submit_id}_{set_name}"
 
     async def initialise(self):
-        if self._sets is not None:
-            raise ValueError("Sets already filled")
-        self._sets = []
-        self._package = await asyncio.to_thread(Package, self.package_path, self.commit_id)
-        for t_set in await asyncio.to_thread(self.package.sets):
-            set_submit = self.master.new_set_submit(self, t_set['name'])
-            self._sets.append(set_submit)
+        async with self.lock:
+            if self._sets is not None:
+                raise ValueError("Sets already filled")
+            self._sets = []
+            self._package = await asyncio.to_thread(Package, self.package_path, self.commit_id)
+            for t_set in await asyncio.to_thread(self.package.sets):
+                set_submit = self.master.new_set_submit(self, t_set['name'])
+                self._sets.append(set_submit)
 
     def all_checked(self) -> bool:
         if self._sets is None:
@@ -282,8 +304,7 @@ class DataMaster(DataMasterInterface):
                 to_be_deleted.append(task_submit)
 
         for task_submit in to_be_deleted:
-            task_submit.change_state(task_submit.TaskState.ERROR)
-            # TODO: log
+            task_submit.change_state(task_submit.TaskState.ERROR, requires=None)
             self.delete_task_submit(task_submit)
 
     async def deletion_daemon(self, task_submit_timeout: timedelta, interval: int):

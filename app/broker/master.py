@@ -4,7 +4,7 @@ from baca2PackageManager.broker_communication import BacaToBroker
 from aiologger import Logger
 
 from .messenger import KolejkaMessengerInterface, BacaMessengerInterface, PackageManagerInterface
-from .datamaster import DataMasterInterface, SetSubmitInterface
+from .datamaster import DataMasterInterface, SetSubmitInterface, TaskSubmitInterface
 
 
 class BrokerMaster:
@@ -21,11 +21,11 @@ class BrokerMaster:
         self.package_manager = package_manager
         self.logger = logger
 
-    async def _kolejka_send_task(self, set_submit: SetSubmitInterface):
-        await set_submit.change_state(set_submit.SetState.SENDING_TO_KOLEJKA)
-        status_code = await self.kolejka_messenger.send(set_submit)
-        set_submit.set_status_code(status_code)
-        await set_submit.change_state(set_submit.SetState.AWAITING_KOLEJKA)
+    async def trash_task_submit(self, task_submit: TaskSubmitInterface, error: Exception):
+        async with task_submit.lock:
+            task_submit.change_state(task_submit.TaskState.ERROR, requires=None)
+            await self.baca_messenger.send_error(task_submit, str(error))
+            self.data_master.delete_task_submit(task_submit)
 
     async def handle_baca(self, data: BacaToBroker):
         task_submit = self.data_master.new_task_submit(data.submit_id,
@@ -38,46 +38,54 @@ class BrokerMaster:
             if not await self.package_manager.check_build(task_submit.package) or self.package_manager.force_rebuild:
                 await self.package_manager.build_package(task_submit.package)
 
-            task_submit.change_state(task_submit.TaskState.AWAITING_SETS)
-            async with asyncio.TaskGroup() as tg:
-                tasks = []
-                for s in task_submit.set_submits:
-                    task = tg.create_task(self._kolejka_send_task(s))
-                    tasks.append(task)
-            if not all(t.done() for t in tasks):
-                raise Exception("Not all tasks finished")  # TODO
-
+            await self.process_task_submit(task_submit)
         except Exception as e:
-            await self.baca_messenger.send_error(task_submit, e)
-            task_submit.change_state(task_submit.TaskState.ERROR)
-            self.data_master.delete_task_submit(task_submit)
+            # log
+            await self.trash_task_submit(task_submit, e)
             raise
+
+    async def process_task_submit(self, task_submit: TaskSubmitInterface):
+
+        async def kolejka_send_task(set_submit: SetSubmitInterface):
+            async with set_submit.lock:
+                set_submit.change_state(set_submit.SetState.SENDING_TO_KOLEJKA,
+                                        requires=set_submit.SetState.INITIAL)
+                status_code = await self.kolejka_messenger.send(set_submit)
+                set_submit.set_status_code(status_code)
+                set_submit.change_state(set_submit.SetState.AWAITING_KOLEJKA,
+                                        requires=set_submit.SetState.SENDING_TO_KOLEJKA)
+
+        task_submit.change_state(task_submit.TaskState.AWAITING_SETS, requires=task_submit.TaskState.INITIAL)
+        async with asyncio.TaskGroup() as tg:
+            tasks = [tg.create_task(kolejka_send_task(s)) for s in task_submit.set_submits]
+        if not all(t.done() for t in tasks):
+            raise RuntimeError("Not all tasks finished (this should never happen)")
 
     async def handle_kolejka(self, submit_id: str):
         try:
             set_submit = self.data_master.get_set_submit(submit_id)
         except self.data_master.DataMasterError as e:
-            # await self.logger.error(str(e))  # FIXME
+            # log
+            raise
+        try:
+            await self.process_finished_set_submit(set_submit)
+        except Exception as e:
+            # log
+            await self.trash_task_submit(set_submit.task_submit, e)
             raise
 
-        if not set_submit.is_active():
-            await self.logger.error(f"Set submit {submit_id} in invalid state")
-            raise Exception(f"Set submit {submit_id} in invalid state")  # TODO
+    async def process_finished_set_submit(self, set_submit: SetSubmitInterface):
 
-        try:
-            await set_submit.change_state(set_submit.SetState.DONE, timeout=10)
+        async with set_submit.lock:
+            set_submit.change_state(set_submit.SetState.DONE,
+                                    requires=set_submit.SetState.AWAITING_KOLEJKA)
             results = await self.kolejka_messenger.get_results(set_submit, set_submit.get_status_code())
             set_submit.set_result(results)
 
-            if set_submit.task_submit.all_checked():
-                task_submit = set_submit.task_submit
-                task_submit.change_state(task_submit.TaskState.DONE)
+        task_submit = set_submit.task_submit
+        async with task_submit.lock:
+            if task_submit.all_checked():
+                task_submit.change_state(task_submit.TaskState.DONE,
+                                         requires=task_submit.TaskState.AWAITING_SETS)
                 await self.baca_messenger.send(task_submit)
                 self.data_master.delete_task_submit(task_submit)
-
-        except Exception as e:
-            task_submit = set_submit.task_submit
-            await self.baca_messenger.send_error(task_submit, e)
-            task_submit.change_state(task_submit.TaskState.ERROR)
-            self.data_master.delete_task_submit(task_submit)
-            raise
