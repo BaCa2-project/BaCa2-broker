@@ -24,6 +24,7 @@ class BrokerMaster:
     async def trash_task_submit(self, task_submit: TaskSubmitInterface, error: Exception):
         async with task_submit.lock:
             task_submit.change_state(task_submit.TaskState.ERROR, requires=None)
+            task_submit.change_set_states(SetSubmitInterface.SetState.ERROR, requires=None)
             await self.baca_messenger.send_error(task_submit, str(error))
             self.data_master.delete_task_submit(task_submit)
 

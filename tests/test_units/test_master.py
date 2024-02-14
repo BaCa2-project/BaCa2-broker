@@ -115,6 +115,27 @@ class MaterTest(unittest.TestCase):
         self.assertRaises(Exception, asyncio.run, self.master.handle_kolejka(set_id))
         self.assertFalse('submit1' in self.data_master.task_submits)
 
+    def test_trash_submit(self):
+        btb = BacaToBroker(pass_hash='x',
+                           submit_id='submit1',
+                           package_path=self.package_path,
+                           commit_id='1',
+                           submit_path=self.submit_path)
+        asyncio.run(self.master.handle_baca(btb))
+        task_submit = self.data_master.task_submits['submit1']
+        self.assertEqual(task_submit.state, TaskSubmit.TaskState.AWAITING_SETS)
+        for set_submit in task_submit.set_submits:
+            self.assertEqual(set_submit.state, SetSubmit.SetState.AWAITING_KOLEJKA)
+
+        asyncio.run(self.master.trash_task_submit(task_submit, Exception('test')))
+
+        self.assertEqual(task_submit.state, TaskSubmit.TaskState.ERROR)
+        for set_submit in task_submit.set_submits:
+            self.assertEqual(set_submit.state, SetSubmit.SetState.ERROR)
+
+        self.assertTrue('submit1' not in self.data_master.task_submits)
+        self.assertTrue(len(self.data_master.set_submits) == 0)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -20,6 +20,7 @@ class SetSubmitInterface(ABC):
         SENDING_TO_KOLEJKA = 1
         AWAITING_KOLEJKA = 2
         DONE = 3
+        ERROR = -1
 
     def __init__(self,
                  master: 'DataMasterInterface',
@@ -131,6 +132,11 @@ class TaskSubmitInterface(ABC):
             states = [states]
         if self.state not in states:
             raise StateError(f"State {self.state} not in {states}")
+
+    def change_set_states(self, new_state: SetSubmit.SetState,
+                          requires: SetSubmit.SetState | list[SetSubmit.SetState] | None):
+        for set_submit in self.set_submits:
+            set_submit.change_state(new_state, requires)
 
     @staticmethod
     @abstractmethod
@@ -305,6 +311,7 @@ class DataMaster(DataMasterInterface):
 
         for task_submit in to_be_deleted:
             task_submit.change_state(task_submit.TaskState.ERROR, requires=None)
+            task_submit.change_set_states(SetSubmitInterface.SetState.ERROR, requires=None)
             self.delete_task_submit(task_submit)
 
     async def deletion_daemon(self, task_submit_timeout: timedelta, interval: int):
