@@ -50,8 +50,7 @@ class BrokerMaster:
             async with set_submit.lock:
                 set_submit.change_state(set_submit.SetState.SENDING_TO_KOLEJKA,
                                         requires=set_submit.SetState.INITIAL)
-                status_code = await self.kolejka_messenger.send(set_submit)
-                set_submit.set_status_code(status_code)
+                await self.kolejka_messenger.send(set_submit)
                 set_submit.change_state(set_submit.SetState.AWAITING_KOLEJKA,
                                         requires=set_submit.SetState.SENDING_TO_KOLEJKA)
 
@@ -79,7 +78,7 @@ class BrokerMaster:
         async with set_submit.lock:
             set_submit.change_state(set_submit.SetState.DONE,
                                     requires=set_submit.SetState.AWAITING_KOLEJKA)
-            results = await self.kolejka_messenger.get_results(set_submit, set_submit.get_status_code())
+            results = await self.kolejka_messenger.get_results(set_submit)
             set_submit.set_result(results)
 
         task_submit = set_submit.task_submit
