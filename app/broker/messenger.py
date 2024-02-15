@@ -30,7 +30,7 @@ class KolejkaMessengerInterface(ABC):
         pass
 
     @abstractmethod
-    async def get_results(self, set_submit: SetSubmitInterface) -> SetResult:
+    async def get_results(self, set_submit: SetSubmitInterface):
         pass
 
 
@@ -111,9 +111,10 @@ class KolejkaMessenger(KolejkaMessengerInterface):
 
         set_submit.set_status_code(result_code)
 
-    async def get_results(self, set_submit: SetSubmitInterface) -> SetResult:
+    async def get_results(self, set_submit: SetSubmitInterface):
         try:
-            return await self._get_results_inner(set_submit, set_submit.get_status_code())
+            results = await self._get_results_inner(set_submit, set_submit.get_status_code())
+            set_submit.set_result(results)
         except Exception as e:
             self.logger.error(str(e))
             raise self.KolejkaCommunicationError("Cannot communicate with KOLEJKA.") from e
@@ -161,11 +162,6 @@ class KolejkaMessenger(KolejkaMessengerInterface):
 
 class KolejkaMessengerActiveWait(KolejkaMessenger):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.tasks = {}
-        self.results = {}
-
     async def _send_inner(self, set_submit: SetSubmitInterface):
         task_submit = set_submit.task_submit
 
@@ -190,13 +186,12 @@ class KolejkaMessengerActiveWait(KolejkaMessenger):
         if judge_future.returncode != 0:
             raise self.KolejkaCommunicationError(f'KOLEJKA judge failed to create task; stderr: {stderr}')
 
-        task = asyncio.create_task(self.results_task(set_submit))
-        self.tasks[set_submit.submit_id] = task
+        set_submit.set_result(await self.results_task(set_submit))
 
-    async def get_results(self, set_submit: SetSubmitInterface) -> SetResult:
-        return self.results.pop(set_submit.submit_id)
+    async def get_results(self, set_submit: SetSubmitInterface):
+        pass
 
-    async def results_task(self, set_submit: SetSubmitInterface):
+    async def results_task(self, set_submit: SetSubmitInterface) -> SetResult:
         task_submit = set_submit.task_submit
         task_dir = self.submits_dir / task_submit.submit_id / f'{set_submit.set_name}.task'
         result_dir = self.submits_dir / set_submit.task_submit.submit_id / f'{set_submit.set_name}.result'
@@ -220,8 +215,8 @@ class KolejkaMessengerActiveWait(KolejkaMessenger):
         if result_future.returncode != 0:
             raise self.KolejkaCommunicationError('KOLEJKA client failed to get results.')
 
-        self.results[set_submit.submit_id] = self._parse_results(set_submit, result_dir)
-        del self.tasks[set_submit.submit_id]
+        results = self._parse_results(set_submit, result_dir)
+        return results
 
 
 class BacaMessengerInterface(ABC):
