@@ -233,7 +233,9 @@ class TaskSubmit(Thread):
         )
         s = requests.Session()
         try:
+            self.vprint(f'[DEBUG] Sending to {baca_url} with {message.serialize()}')
             r = s.post(url=baca_url, json=message.serialize())
+            self.vprint(f'[DEBUG] Response: {r.status_code}')
         except (requests.exceptions.RequestException, requests.exceptions.ChunkedEncodingError):
             return False
         else:

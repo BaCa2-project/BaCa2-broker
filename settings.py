@@ -13,11 +13,11 @@ MODES = {
         'delete_records': False,
         'verbose': True,
         'force_rebuild': True,
-        'server_ip': 'baca2.ii.uj.edu.pl',
+        'server_ip': os.getenv('IP'),
         'server_port': 8180,
         'default_timeout': timedelta(minutes=10),
         'default_timestep': timedelta(seconds=10),
-        'active_wait': False,
+        'active_wait': True,
     },
     'development': {
         'delete_records': True,
@@ -26,7 +26,7 @@ MODES = {
         'default_timeout': timedelta(minutes=3),
         'default_timestep': timedelta(seconds=2),
         'active_wait': True,
-        'server_ip': '127.0.0.1',
+        'server_ip': os.getenv('IP', '127.0.0.1'),
         'server_port': 8180,
     }
 }
