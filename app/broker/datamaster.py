@@ -284,7 +284,7 @@ class DataMaster(DataMasterInterface):
         self.task_submits[task_submit_id] = task_submit
         return task_submit
 
-    def new_set_submit(self, task_submit: 'TaskSubmitInterface', set_name: str, ) -> SetSubmitInterface:
+    def new_set_submit(self, task_submit: 'TaskSubmitInterface', set_name: str) -> SetSubmitInterface:
         set_submit_id = task_submit.make_set_submit_id(task_submit.submit_id, set_name)
         if set_submit_id in self.set_submits:
             raise self.DataMasterError(f"Set submit {set_submit_id} already exists")
