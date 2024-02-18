@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from baca2PackageManager.broker_communication import BacaToBroker
+from baca2PackageManager import Package
 
 from .messenger import KolejkaMessengerInterface, BacaMessengerInterface, PackageManagerInterface
 from .datamaster import DataMasterInterface, SetSubmitInterface, TaskSubmitInterface
@@ -20,47 +20,6 @@ class BrokerMaster:
         self.data_master = data_master
         self.package_manager = package_manager
         self.logger = logger
-
-    async def handle_baca(self, data: BacaToBroker):
-        try:
-            task_submit = self.data_master.new_task_submit(data.submit_id,
-                                                           data.package_path,
-                                                           data.commit_id,
-                                                           data.submit_path)
-        except self.data_master.DataMasterError as e:
-            self.logger.error("%s", str(e))
-            raise
-
-        try:
-            await task_submit.initialise()
-
-            if not await self.package_manager.check_build(task_submit.package) or self.package_manager.force_rebuild:
-                self.logger.log(logging.INFO, f"Building package '{task_submit.package.name}'")
-                await self.package_manager.build_package(task_submit.package)
-
-            await self.process_new_task_submit(task_submit)
-        except Exception as e:
-            self.logger.error("Error while processing task submit '%s': %s", data.submit_id, str(e))
-            await self.trash_task_submit(task_submit, e)
-            raise
-
-        self.logger.log(logging.INFO, f"Task submit '{data.submit_id}' processed successfully")
-
-    async def handle_kolejka(self, submit_id: str):
-        try:
-            set_submit = self.data_master.get_set_submit(submit_id)
-        except self.data_master.DataMasterError as e:
-            self.logger.error("%s", str(e))
-            raise
-        try:
-            await self.process_finished_set_submit(set_submit)
-            task_submit = set_submit.task_submit
-            if task_submit.all_checked() and task_submit.state == task_submit.TaskState.AWAITING_SETS:
-                await self.process_finished_task_submit(task_submit)
-        except Exception as e:
-            self.logger.error("Error while processing set submit '%s': %s", submit_id, str(e))
-            await self.trash_task_submit(set_submit.task_submit, e)
-            raise
 
     async def process_new_task_submit(self, task_submit: TaskSubmitInterface):
 
@@ -102,3 +61,8 @@ class BrokerMaster:
                                  requires=task_submit.TaskState.AWAITING_SETS)
         await self.baca_messenger.send(task_submit)
         self.data_master.delete_task_submit(task_submit)
+
+    async def process_package(self, package: Package):
+        if not await self.package_manager.check_build(package) or self.package_manager.force_rebuild:
+            self.logger.log(logging.INFO, f"Building package '{package.name}'")
+            await self.package_manager.build_package(package)

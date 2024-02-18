@@ -9,6 +9,10 @@ import settings
 from .broker.master import BrokerMaster
 from .broker.datamaster import DataMaster, SetSubmit, TaskSubmit
 from .broker.messenger import KolejkaMessenger, BacaMessenger, PackageManager
+from .handlers import PassiveHandler, ActiveHandler
+
+
+# APP ===================================================================================
 
 
 logger = logging.Logger(__name__)
@@ -48,9 +52,16 @@ master = BrokerMaster(
     logger=logger
 )
 
+if settings.ACTIVE_WAIT:
+    handlers = ActiveHandler(master, master.kolejka_messenger, logger)
+else:
+    handlers = PassiveHandler(master, logger)
+
 app = FastAPI()
 daemons = set()
 
+
+# BEFORE SHUTDOWN AND STARTUP ===========================================================
 
 @app.on_event("startup")
 async def start_daemons():
@@ -66,6 +77,8 @@ async def stop_daemons():
     await asyncio.gather(*daemons, return_exceptions=True)
 
 
+# VIEWS =================================================================================
+
 class Content(BaseModel):
     """Content of baCa2 submit request"""
     submit_id: str
@@ -73,19 +86,6 @@ class Content(BaseModel):
     package_path: str
     commit_id: str
     submit_path: str
-
-
-@app.post("/kolejka/{submit_id}")
-async def kolejka_post(submit_id: str, background_tasks: BackgroundTasks):
-    """Handle notifications from kolejka"""
-    submit_normalized = submit_id.replace('_', '')
-
-    if not submit_normalized.isalnum():
-        raise HTTPException(status_code=400)
-
-    background_tasks.add_task(master.handle_kolejka, submit_normalized)
-
-    return {"message": "Success", "status_code": 200}
 
 
 @app.post("/baca")
@@ -100,6 +100,22 @@ async def baca_post(content: Content, background_tasks: BackgroundTasks):
     if make_hash(settings.BROKER_PASSWORD, btb.submit_id) != btb.pass_hash:
         raise HTTPException(status_code=401, detail="Wrong Password")
 
-    background_tasks.add_task(master.handle_baca, btb)
+    background_tasks.add_task(handlers.handle_baca, btb)
+
+    return {"message": "Success", "status_code": 200}
+
+
+@app.post("/kolejka/{submit_id}")
+async def kolejka_post(submit_id: str, background_tasks: BackgroundTasks):
+    """Handle notifications from kolejka"""
+    if settings.ACTIVE_WAIT:
+        raise HTTPException(status_code=404, detail="Not Active - broker in 'active wait' mode")
+
+    submit_normalized = submit_id.replace('_', '')
+
+    if not submit_normalized.isalnum():
+        raise HTTPException(status_code=400)
+
+    background_tasks.add_task(handlers.handle_kolejka, submit_normalized)
 
     return {"message": "Success", "status_code": 200}

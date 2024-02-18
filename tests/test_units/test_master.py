@@ -9,6 +9,7 @@ from baca2PackageManager.broker_communication import SetResult, BacaToBroker
 from app.broker import BrokerMaster
 from app.broker.datamaster import DataMaster, SetSubmit, TaskSubmit, SetSubmitInterface, TaskSubmitInterface
 from app.broker.messenger import KolejkaMessengerInterface, BacaMessengerInterface, PackageManagerInterface
+from app.handlers import PassiveHandler
 
 
 class MaterTest(unittest.TestCase):
@@ -72,6 +73,7 @@ class MaterTest(unittest.TestCase):
                                    self.baca_messenger,
                                    self.package_manager,
                                    self.logger)
+        self.handlers = PassiveHandler(self.master, self.logger)
 
     def test_baca_send(self):
         btb = BacaToBroker(pass_hash='x',
@@ -79,14 +81,14 @@ class MaterTest(unittest.TestCase):
                            package_path=self.package_path,
                            commit_id='1',
                            submit_path=self.submit_path)
-        asyncio.run(self.master.handle_baca(btb))
+        asyncio.run(self.handlers.handle_baca(btb))
         self.assertTrue('submit1' in self.data_master.task_submits)
         self.assertEqual(len(self.data_master.set_submits), 3)
-        self.assertRaises(Exception, asyncio.run, self.master.handle_baca(btb))
+        self.assertRaises(Exception, asyncio.run, self.handlers.handle_baca(btb))
         self.data_master.delete_task_submit(self.data_master.task_submits['submit1'])
 
         self.kolejka_messenger.raise_exception = True
-        self.assertRaises(Exception, asyncio.run, self.master.handle_baca(btb))
+        self.assertRaises(Exception, asyncio.run, self.handlers.handle_baca(btb))
         self.assertFalse('submit1' in self.data_master.task_submits)
 
     def test_kolejka_receive(self):
@@ -95,26 +97,26 @@ class MaterTest(unittest.TestCase):
                            package_path=self.package_path,
                            commit_id='1',
                            submit_path=self.submit_path)
-        asyncio.run(self.master.handle_baca(btb))
+        asyncio.run(self.handlers.handle_baca(btb))
         task_submit = self.data_master.task_submits['submit1']
         self.assertEqual(task_submit.state, TaskSubmit.TaskState.AWAITING_SETS)
         for set_submit in task_submit.set_submits:
             self.assertEqual(set_submit.get_status_code(), '200')
             set_id = task_submit.make_set_submit_id(task_submit.submit_id, set_submit.set_name)
-            asyncio.run(self.master.handle_kolejka(set_id))
+            asyncio.run(self.handlers.handle_kolejka(set_id))
             self.assertEqual(set_submit.state, SetSubmit.SetState.DONE)
         tmp = task_submit.set_submits[0]
         set_id = task_submit.make_set_submit_id(task_submit.submit_id, tmp.set_name)
-        self.assertRaises(self.data_master.DataMasterError, asyncio.run, self.master.handle_kolejka(set_id))
+        self.assertRaises(self.data_master.DataMasterError, asyncio.run, self.handlers.handle_kolejka(set_id))
         self.assertEqual(task_submit.state, TaskSubmit.TaskState.DONE)
         self.assertTrue(task_submit.submit_id not in self.data_master.task_submits)
 
-        asyncio.run(self.master.handle_baca(btb))
+        asyncio.run(self.handlers.handle_baca(btb))
         task_submit = self.data_master.task_submits['submit1']
         set_submit = task_submit.set_submits[0]
         set_id = task_submit.make_set_submit_id(task_submit.submit_id, set_submit.set_name)
         self.kolejka_messenger.raise_exception = True
-        self.assertRaises(Exception, asyncio.run, self.master.handle_kolejka(set_id))
+        self.assertRaises(Exception, asyncio.run, self.handlers.handle_kolejka(set_id))
         self.assertFalse('submit1' in self.data_master.task_submits)
 
     def test_trash_submit(self):
@@ -123,7 +125,7 @@ class MaterTest(unittest.TestCase):
                            package_path=self.package_path,
                            commit_id='1',
                            submit_path=self.submit_path)
-        asyncio.run(self.master.handle_baca(btb))
+        asyncio.run(self.handlers.handle_baca(btb))
         task_submit = self.data_master.task_submits['submit1']
         self.assertEqual(task_submit.state, TaskSubmit.TaskState.AWAITING_SETS)
         for set_submit in task_submit.set_submits:
@@ -163,6 +165,7 @@ class MaterTest(unittest.TestCase):
                 super().__init__(*args, **kwargs)
                 self.raise_exception = False
                 self.master = None
+                self.handlers = None
                 self.tasks = set()
 
             async def get_results(self, set_submit: SetSubmitInterface) -> SetResult:
@@ -176,8 +179,8 @@ class MaterTest(unittest.TestCase):
                 if self.raise_exception:
                     raise Exception
                 set_submit.set_status_code('200')
-                if self.master:
-                    task = asyncio.create_task(self.master.handle_kolejka(set_submit.submit_id))
+                if self.handlers is not None:
+                    task = asyncio.create_task(self.handlers.handle_kolejka(set_submit.submit_id))
                     self.tasks.add(task)
 
         kolejka_messenger = KolejkaMessengerMockInner()
@@ -188,6 +191,8 @@ class MaterTest(unittest.TestCase):
                               self.package_manager,
                               self.logger)
         master.kolejka_messenger.master = master
+        handlers = PassiveHandler(master, self.logger)
+        kolejka_messenger.handlers = handlers
         btb_list = [BacaToBroker(pass_hash='x',
                                  submit_id=f'submit{i}',
                                  package_path=self.package_path,
@@ -195,7 +200,7 @@ class MaterTest(unittest.TestCase):
                                  submit_path=self.submit_path) for i in range(100)]
 
         async def run():
-            await asyncio.gather(*[master.handle_baca(btb) for btb in btb_list], return_exceptions=True)
+            await asyncio.gather(*[handlers.handle_baca(btb) for btb in btb_list], return_exceptions=True)
             await asyncio.gather(*kolejka_messenger.tasks, return_exceptions=True)
 
         asyncio.run(run())
