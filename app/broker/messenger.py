@@ -142,7 +142,7 @@ class KolejkaMessenger(KolejkaMessengerInterface):
         return self._parse_results(set_submit, result_dir)
 
     @staticmethod
-    def _parse_results(set_submit: SetSubmitInterface, result_dir: Path) -> SetResult:  # TODO: change to async?
+    def _parse_results(set_submit: SetSubmitInterface, result_dir: Path) -> SetResult:
         results_yaml = result_dir / 'results' / 'results.yaml'
         with open(results_yaml) as f:
             content: dict = yaml.load(f, Loader=get_loader())
