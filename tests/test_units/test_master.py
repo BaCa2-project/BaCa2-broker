@@ -1,5 +1,5 @@
 import asyncio
-import logging
+import os
 import unittest
 from pathlib import Path
 
@@ -10,10 +10,12 @@ from app.broker import BrokerMaster
 from app.broker.datamaster import DataMaster, SetSubmit, TaskSubmit, SetSubmitInterface, TaskSubmitInterface
 from app.broker.messenger import KolejkaMessengerInterface, BacaMessengerInterface, PackageManagerInterface
 from app.handlers import PassiveHandler
+from app.logger import LoggerManager
 
 
 class MaterTest(unittest.TestCase):
     test_dir = Path(__file__).parent.parent
+    resource_dir = test_dir / 'resources'
 
     class KolejkaMessengerMock(KolejkaMessengerInterface):
 
@@ -57,13 +59,13 @@ class MaterTest(unittest.TestCase):
             await asyncio.sleep(0.01)
 
     def setUp(self):
-        self.package_path = self.test_dir / 'resources' / '1'
-        self.submit_path = self.test_dir / 'resources' / '1' / '1' / 'prog' / 'solution.cpp'
+        self.package_path = self.resource_dir / '1'
+        self.submit_path = self.resource_dir / '1' / '1' / 'prog' / 'solution.cpp'
 
-        self.logger = logging.Logger('test')
-        x = logging.Formatter('%(filename)s:%(lineno)d: %(message)s')
-        self.logger.addHandler(logging.StreamHandler())
-        self.logger.handlers[0].setFormatter(x)
+        self.logger_manager = LoggerManager('test', self.test_dir / 'test.log', 0)
+        self.logger_manager.set_formatter('%(filename)s:%(lineno)d: %(message)s')
+        self.logger_manager.start()
+        self.logger = self.logger_manager.logger
         self.data_master = DataMaster(TaskSubmit, SetSubmit, self.logger)
         self.kolejka_messenger = self.KolejkaMessengerMock()
         self.baca_messenger = self.BacaMessengerMock()
@@ -74,6 +76,12 @@ class MaterTest(unittest.TestCase):
                                    self.package_manager,
                                    self.logger)
         self.handlers = PassiveHandler(self.master, self.logger)
+
+    def tearDown(self):
+        self.logger_manager.stop()
+        with open(self.test_dir / 'test.log') as f:
+            print(f.read())
+        os.remove(self.test_dir / 'test.log')
 
     def test_baca_send(self):
         btb = BacaToBroker(pass_hash='x',

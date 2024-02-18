@@ -10,12 +10,16 @@ from .broker.master import BrokerMaster
 from .broker.datamaster import DataMaster, SetSubmit, TaskSubmit
 from .broker.messenger import KolejkaMessenger, BacaMessenger, PackageManager
 from .handlers import PassiveHandler, ActiveHandler
+from .logger import LoggerManager
 
 
 # APP ===================================================================================
 
 
-logger = logging.Logger(__name__)
+logger_manager = LoggerManager('app', settings.LOG_FILE, 0)
+logger_manager.set_formatter('%(filename)s:%(lineno)d: %(message)s')
+logger_manager.start()
+logger = logger_manager.logger
 
 data_master = DataMaster(
     task_submit_t=TaskSubmit,
@@ -75,6 +79,11 @@ async def stop_daemons():
     for task in daemons:
         task.cancel()
     await asyncio.gather(*daemons, return_exceptions=True)
+
+
+@app.on_event("shutdown")
+async def stop_logger():
+    logger_manager.stop()
 
 
 # VIEWS =================================================================================

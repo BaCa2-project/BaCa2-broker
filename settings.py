@@ -60,3 +60,6 @@ BACA_PASSWORD = os.getenv('BACA_PASSWORD')
 BROKER_PASSWORD = os.getenv('BROKER_PASSWORD')
 
 ACTIVE_WAIT = False
+LOG_DIR = BASE_DIR / 'logs'
+LOG_DIR.mkdir(exist_ok=True)
+LOG_FILE = LOG_DIR / 'broker.log'

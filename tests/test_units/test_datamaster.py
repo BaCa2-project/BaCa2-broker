@@ -1,5 +1,5 @@
 import asyncio
-import logging
+import os
 import unittest
 from datetime import timedelta
 from pathlib import Path
@@ -9,9 +9,12 @@ from baca2PackageManager.broker_communication import BrokerToBaca
 
 from app.broker.datamaster import (DataMasterInterface, TaskSubmitInterface, SetSubmitInterface,
                                    DataMaster, TaskSubmit, SetSubmit, StateError)
+from app.logger import LoggerManager
 
 
 class DatamasterTest(unittest.TestCase):
+
+    test_dir = Path(__file__).parent.parent
 
     class TaskSubmitMock(TaskSubmitInterface):
         @staticmethod
@@ -57,9 +60,17 @@ class DatamasterTest(unittest.TestCase):
             return [s.get_result() for s in self.set_submits]
 
     def setUp(self):
-        self.logger = logging.Logger('test')
-        self.logger.addHandler(logging.StreamHandler())
+        self.logger_manager = LoggerManager('test', self.test_dir / 'test.log', 0)
+        self.logger_manager.set_formatter('%(filename)s:%(lineno)d: %(message)s')
+        self.logger_manager.start()
+        self.logger = self.logger_manager.logger
         self.data_master = DataMaster(self.TaskSubmitMock, SetSubmit, self.logger)
+
+    def tearDown(self):
+        self.logger_manager.stop()
+        with open(self.test_dir / 'test.log') as f:
+            print(f.read())
+        os.remove(self.test_dir / 'test.log')
 
     def test_new_task_submit(self):
         task_submit = self.data_master.new_task_submit("submit_id", Path("package_path"),
@@ -123,15 +134,24 @@ class DatamasterTest(unittest.TestCase):
 class SubmitsTest(unittest.TestCase):
 
     test_dir = Path(__file__).absolute().parent.parent
+    resource_dir = test_dir / 'resources'
 
     def setUp(self):
-        self.logger = logging.Logger('test')
-        self.logger.addHandler(logging.StreamHandler())
+        self.logger_manager = LoggerManager('test', self.test_dir / 'test.log', 0)
+        self.logger_manager.set_formatter('%(filename)s:%(lineno)d: %(message)s')
+        self.logger_manager.start()
+        self.logger = self.logger_manager.logger
         self.data_master = DataMaster(TaskSubmit, SetSubmit, self.logger)
-        package_path = self.test_dir / 'resources' / '1'
-        submit_path = self.test_dir / 'resources' / '1' / '1' / 'prog' / 'solution.cpp'
+        package_path = self.resource_dir / '1'
+        submit_path = self.resource_dir / '1' / '1' / 'prog' / 'solution.cpp'
         self.task_submit = self.data_master.new_task_submit("submit_id", package_path,
                                                             "1", submit_path)
+
+    def tearDown(self):
+        self.logger_manager.stop()
+        with open(self.test_dir / 'test.log') as f:
+            print(f.read())
+        os.remove(self.test_dir / 'test.log')
 
     def test_new_task_submit(self):
         asyncio.run(self.task_submit.initialise())
