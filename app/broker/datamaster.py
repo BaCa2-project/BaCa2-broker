@@ -38,7 +38,13 @@ class SetSubmitInterface(ABC):
 
     def change_state(self, new_state: SetState, requires: SetState | list[SetState] | None):
         if requires is not None:
-            self.requires(requires)
+            try:
+                self.requires(requires)
+            except StateError:
+                msg = ("Illegal state change of set_submit '%s': %s -> %s (%s allowed)"
+                       % (self.submit_id, self.state.name, new_state.name, requires))
+                self.master.logger.error(msg)
+                raise StateError(msg)
         self.master.logger.log(logging.INFO, "State of set_submit '%s': %s -> %s",
                                self.submit_id, self.state.name, new_state.name)
         self.mod_date = datetime.now()
@@ -126,7 +132,13 @@ class TaskSubmitInterface(ABC):
 
     def change_state(self, new_state: TaskState, requires: TaskState | list[TaskState] | None):
         if requires is not None:
-            self.requires(requires)
+            try:
+                self.requires(requires)
+            except StateError:
+                msg = ("Illegal state change of task_submit '%s': %s -> %s (%s allowed)"
+                       % (self.submit_id, self.state.name, new_state.name, requires))
+                self.master.logger.error(msg)
+                raise StateError(msg)
         self.master.logger.log(logging.INFO, "State of task_submit '%s': %s -> %s",
                                self.submit_id, self.state.name, new_state.name)
         self.mod_date = datetime.now()

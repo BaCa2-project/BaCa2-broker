@@ -56,7 +56,6 @@ class BrokerMaster:
             await self.kolejka_messenger.get_results(set_submit)
 
     async def process_finished_task_submit(self, task_submit: TaskSubmitInterface):
-        self.logger.log(logging.INFO, "All sets checked for task submit '%s'", task_submit.submit_id)
         task_submit.change_state(task_submit.TaskState.DONE,
                                  requires=task_submit.TaskState.AWAITING_SETS)
         await self.baca_messenger.send(task_submit)
@@ -64,5 +63,6 @@ class BrokerMaster:
 
     async def process_package(self, package: Package):
         if not await self.package_manager.check_build(package) or self.package_manager.force_rebuild:
-            self.logger.log(logging.INFO, f"Building package '{package.name}'")
+            self.logger.log(logging.INFO, "Building package '%s'", package.name)
             await self.package_manager.build_package(package)
+            self.logger.log(logging.INFO, "Package '%s' built successfully", package.name)

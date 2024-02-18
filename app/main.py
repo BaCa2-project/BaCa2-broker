@@ -23,7 +23,7 @@ logger = logger_manager.logger
 data_master = DataMaster(
     task_submit_t=TaskSubmit,
     set_submit_t=SetSubmit,
-    logger=logger
+    logger=logger.getChild('datamaster')
 )
 
 kolejka_messanger = KolejkaMessenger(
@@ -31,14 +31,14 @@ kolejka_messanger = KolejkaMessenger(
     build_namespace=settings.BUILD_NAMESPACE,
     kolejka_conf=settings.KOLEJKA_CONF,
     kolejka_callback_url_prefix=settings.KOLEJKA_CALLBACK_URL_PREFIX,
-    logger=logger
+    logger=logger.getChild('kolejka_messenger')
 )
 
 baca_messanger = BacaMessenger(
     baca_success_url=settings.BACA_RESULTS_URL,
     baca_failure_url=settings.BACA_ERROR_URL,
     password=settings.BACA_PASSWORD,
-    logger=logger
+    logger=logger.getChild('baca_messenger')
 )
 
 package_manager = PackageManager(
@@ -52,7 +52,7 @@ master = BrokerMaster(
     kolejka_messenger=kolejka_messanger,
     baca_messenger=baca_messanger,
     package_manager=package_manager,
-    logger=logger
+    logger=logger.getChild('master')
 )
 
 if settings.ACTIVE_WAIT:
