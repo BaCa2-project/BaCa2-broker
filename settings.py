@@ -63,3 +63,4 @@ ACTIVE_WAIT = False
 LOG_DIR = BASE_DIR / 'logs'
 LOG_DIR.mkdir(exist_ok=True)
 LOG_FILE = LOG_DIR / 'broker.log'
+LOGGER_PROMPT = '%(filename)s:%(lineno)d: %(message)s'

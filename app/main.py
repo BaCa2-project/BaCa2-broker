@@ -1,5 +1,4 @@
 import asyncio
-import logging
 
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from pydantic import BaseModel
@@ -17,7 +16,7 @@ from .logger import LoggerManager
 
 
 logger_manager = LoggerManager('app', settings.LOG_FILE, 0)
-logger_manager.set_formatter('%(filename)s:%(lineno)d: %(message)s')
+logger_manager.set_formatter(settings.LOGGER_PROMPT)
 logger_manager.start()
 logger = logger_manager.logger
 
