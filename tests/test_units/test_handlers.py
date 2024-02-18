@@ -212,7 +212,6 @@ class MaterTest(unittest.TestCase):
             await asyncio.gather(*kolejka_messenger.tasks, return_exceptions=True)
 
         asyncio.run(run())
-        print(self.data_master.task_submits)
         self.assertTrue(len(self.data_master.task_submits) == 0)
         self.assertEqual(100, len(baca_messenger.processed))
 

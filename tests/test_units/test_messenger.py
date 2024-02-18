@@ -93,3 +93,7 @@ class BacaMessengerTest(unittest.TestCase):
                                      submit_path=None)
         with self.assertRaises(Exception):
             asyncio.run(self.baca_messenger.send(task_submit))
+
+
+if __name__ == '__main__':
+    unittest.main()
