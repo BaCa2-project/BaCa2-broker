@@ -1,3 +1,5 @@
+import shutil
+
 import asyncio
 import logging
 import unittest
@@ -12,7 +14,8 @@ from baca2PackageManager.broker_communication import BrokerToBaca
 from settings import SUBMITS_DIR, BUILD_NAMESPACE, KOLEJKA_CONF, KOLEJKA_SRC_DIR
 
 from app.broker.messenger import BacaMessenger, KolejkaMessenger, PackageManager
-from app.broker.datamaster import TaskSubmitInterface, SetSubmitInterface, TaskSubmit, DataMaster, SetSubmit
+from app.broker.datamaster import TaskSubmitInterface, SetSubmitInterface, TaskSubmit, DataMaster, \
+    SetSubmit
 
 app = FastAPI()
 
@@ -58,14 +61,16 @@ class MockTaskSubmit(TaskSubmitInterface):
 
 
 class BacaMessengerTest(unittest.TestCase):
-
     server_thread = None
+    TEST_PORT = 9432
 
     @classmethod
     def setUpClass(cls):
+        import settings
+
         cls.server_thread = Thread(target=uvicorn.run,
                                    args=(app,),
-                                   kwargs={"host": "localhost", "port": 8000},
+                                   kwargs={"host": "localhost", "port": cls.TEST_PORT},
                                    daemon=True)
         cls.server_thread.start()
         sleep(0.2)
@@ -74,28 +79,29 @@ class BacaMessengerTest(unittest.TestCase):
         self.logger = logging.Logger('test')
         self.logger.addHandler(logging.StreamHandler())
         self.baca_messenger = BacaMessenger(
-            baca_success_url="http://localhost:8000/success",
-            baca_failure_url="http://localhost:8000/failure",
+            baca_success_url=f"http://localhost:{self.TEST_PORT}/success",
+            baca_failure_url=f"http://localhost:{self.TEST_PORT}/failure",
             password="password",
             logger=self.logger
         )
 
     def test_baca_send(self):
-        task_submit = MockTaskSubmit(master=None, task_submit_id="submit_id", package_path=None, commit_id="commit_id",
+        task_submit = MockTaskSubmit(master=None, task_submit_id="submit_id", package_path=None,
+                                     commit_id="commit_id",
                                      submit_path=None)
         status_code = asyncio.run(self.baca_messenger.send(task_submit))
         self.assertEqual(200, status_code)
 
     def test_baca_send_error(self):
-        self.baca_messenger.baca_success_url = "http://localhost:8000/success_error"
-        task_submit = MockTaskSubmit(master=None, task_submit_id="submit_id", package_path=None, commit_id="commit_id",
+        self.baca_messenger.baca_success_url = f"http://localhost:{self.TEST_PORT}/success_error"
+        task_submit = MockTaskSubmit(master=None, task_submit_id="submit_id", package_path=None,
+                                     commit_id="commit_id",
                                      submit_path=None)
         with self.assertRaises(Exception):
             asyncio.run(self.baca_messenger.send(task_submit))
 
 
 class KolejkaMessengerTest(unittest.TestCase):
-
     test_dir = Path(__file__).parent.parent
 
     def setUp(self):
@@ -118,7 +124,10 @@ class KolejkaMessengerTest(unittest.TestCase):
         )
         self.package_manager.refresh_kolejka_src()
 
-    def test_send_kolejka(self):  # TODO finish this test
+        shutil.rmtree(SUBMITS_DIR / 'submit_id', ignore_errors=True)
+        shutil.rmtree(SUBMITS_DIR / '1', ignore_errors=True)
+
+    def test_01_send_kolejka(self):  # TODO finish this test
         task_submit = self.data_master.new_task_submit(task_submit_id="1",
                                                        package_path=self.package_path,
                                                        commit_id="1",
@@ -126,10 +135,12 @@ class KolejkaMessengerTest(unittest.TestCase):
         asyncio.run(task_submit.initialise())
         asyncio.run(self.package_manager.build_package(task_submit.package))
         set_submit = task_submit.set_submits[0]
-        status_code = asyncio.run(self.kolejka_messanger.send(set_submit))
-        print(status_code)
+        asyncio.run(self.kolejka_messanger.send(set_submit))
+        print(set_submit.get_status_code())
+        self.assertIsNotNone(set_submit.get_status_code())
+        self.assertNotEqual('', set_submit.get_status_code())
 
-    def test_kolejka_receive(self):  # TODO: finish this test
+    def test_02_kolejka_receive(self):  # TODO: finish this test
         task_submit = self.data_master.new_task_submit(task_submit_id="submit_id",
                                                        package_path=self.package_path,
                                                        commit_id="1",
@@ -139,7 +150,8 @@ class KolejkaMessengerTest(unittest.TestCase):
         set_submit = task_submit.set_submits[0]
         asyncio.run(self.kolejka_messanger.send(set_submit))
         sleep(20)
-        self.kolejka_messanger.get_results(set_submit)
+        asyncio.run(self.kolejka_messanger.get_results(set_submit))
+        print(f'{set_submit.get_result()=}')
 
 
 if __name__ == '__main__':

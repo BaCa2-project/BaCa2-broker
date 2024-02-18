@@ -9,8 +9,8 @@ from baca2PackageManager import set_base_dir, add_supported_extensions
 load_dotenv()
 
 
-SERVER_HOST: str = '0.0.0.0'  # 'baca2.ii.uj.edu.pl'
-SERVER_PORT: int = 8180
+SERVER_HOST: str = os.getenv('IP')  # 'baca2.ii.uj.edu.pl'
+SERVER_PORT: int = int(os.getenv('PORT'))
 
 KOLEJKA_CALLBACK_URL_PREFIX = f'http://{SERVER_HOST}:{SERVER_PORT}/kolejka'
 
