@@ -38,7 +38,7 @@ class KolejkaMessengerTest(unittest.TestCase):
         shutil.rmtree(SUBMITS_DIR / 'submit_id', ignore_errors=True)
         shutil.rmtree(SUBMITS_DIR / '1', ignore_errors=True)
 
-    def test_01_send_kolejka(self):  # TODO finish this test
+    def test_send_kolejka(self):
         task_submit = self.data_master.new_task_submit(task_submit_id="1",
                                                        package_path=self.package_path,
                                                        commit_id="1",
@@ -51,7 +51,7 @@ class KolejkaMessengerTest(unittest.TestCase):
         self.assertIsNotNone(set_submit.get_status_code())
         self.assertNotEqual('', set_submit.get_status_code())
 
-    def test_02_kolejka_receive(self):  # TODO: finish this test
+    def test_kolejka_receive(self):
         task_submit = self.data_master.new_task_submit(task_submit_id="submit_id",
                                                        package_path=self.package_path,
                                                        commit_id="1",
@@ -62,6 +62,7 @@ class KolejkaMessengerTest(unittest.TestCase):
         asyncio.run(self.kolejka_messanger.send(set_submit))
         sleep(20)
         asyncio.run(self.kolejka_messanger.get_results(set_submit))
+        self.assertEqual(set_submit.get_result().tests['1'], 'mem')
         print(f'{set_submit.get_result()=}')
 
 

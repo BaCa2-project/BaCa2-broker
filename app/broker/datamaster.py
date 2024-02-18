@@ -7,7 +7,7 @@ from enum import Enum
 from pathlib import Path
 
 from baca2PackageManager import Package
-from baca2PackageManager.broker_communication import BrokerToBaca
+from baca2PackageManager.broker_communication import BrokerToBaca, SetResult
 
 
 class StateError(Exception):
@@ -55,11 +55,11 @@ class SetSubmitInterface(ABC):
         return self.task_submit.make_set_submit_id(self.task_submit.submit_id, self.set_name)
 
     @abstractmethod
-    def set_result(self, result: BrokerToBaca):
+    def set_result(self, result: SetResult):
         pass
 
     @abstractmethod
-    def get_result(self) -> BrokerToBaca:
+    def get_result(self) -> SetResult:
         pass
 
     @abstractmethod

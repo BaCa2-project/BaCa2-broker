@@ -86,13 +86,20 @@ class BacaMessengerTest(unittest.TestCase):
         status_code = asyncio.run(self.baca_messenger.send(task_submit))
         self.assertEqual(200, status_code)
 
-    def test_baca_send_error(self):
+    def test_baca_send_exception(self):
         self.baca_messenger.baca_success_url = f"http://localhost:{self.TEST_PORT}/success_error"
         task_submit = MockTaskSubmit(master=None, task_submit_id="submit_id", package_path=None,
                                      commit_id="commit_id",
                                      submit_path=None)
         with self.assertRaises(Exception):
             asyncio.run(self.baca_messenger.send(task_submit))
+
+    def test_baca_error(self):
+        task_submit = MockTaskSubmit(master=None, task_submit_id="submit_id", package_path=None,
+                                     commit_id="commit_id",
+                                     submit_path=None)
+        out = asyncio.run(self.baca_messenger.send_error(task_submit, "error"))
+        self.assertTrue(out)
 
 
 if __name__ == '__main__':

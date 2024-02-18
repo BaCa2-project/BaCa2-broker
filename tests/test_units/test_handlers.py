@@ -9,11 +9,11 @@ from baca2PackageManager.broker_communication import SetResult, BacaToBroker
 from app.broker import BrokerMaster
 from app.broker.datamaster import DataMaster, SetSubmit, TaskSubmit, SetSubmitInterface, TaskSubmitInterface
 from app.broker.messenger import KolejkaMessengerInterface, BacaMessengerInterface, PackageManagerInterface
-from app.handlers import PassiveHandler
+from app.handlers import PassiveHandler, ActiveHandler
 from app.logger import LoggerManager
 
 
-class MaterTest(unittest.TestCase):
+class MasterTest(unittest.TestCase):
     test_dir = Path(__file__).parent.parent
     resource_dir = test_dir / 'resources'
 
@@ -214,6 +214,72 @@ class MaterTest(unittest.TestCase):
         asyncio.run(run())
         self.assertTrue(len(self.data_master.task_submits) == 0)
         self.assertEqual(100, len(baca_messenger.processed))
+
+
+class ActiveHandlerTest(unittest.TestCase):
+
+    resource_dir = MasterTest.resource_dir
+    test_dir = MasterTest.test_dir
+
+    class KolejkaMessengerMock(KolejkaMessengerInterface):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.raise_exception = False
+            self.processed: list[SetSubmitInterface] = []
+
+        async def get_results(self, set_submit: SetSubmitInterface):
+            pass
+
+        async def send(self, set_submit: SetSubmitInterface):
+            await asyncio.sleep(0.01)
+            if self.raise_exception:
+                raise Exception
+            self.processed.append(set_submit)
+            set_submit.set_result(SetResult(name='x', tests=[]))
+
+    def setUp(self):
+        self.package_path = self.resource_dir / '1'
+        self.submit_path = self.resource_dir / '1' / '1' / 'prog' / 'solution.cpp'
+
+        self.logger_manager = LoggerManager('test', self.test_dir / 'test.log', 0)
+        self.logger_manager.set_formatter('%(filename)s:%(lineno)d: %(message)s')
+        self.logger_manager.start()
+        self.logger = self.logger_manager.logger
+        self.data_master = DataMaster(TaskSubmit, SetSubmit, self.logger)
+        self.kolejka_messenger = self.KolejkaMessengerMock()
+        self.baca_messenger = MasterTest.BacaMessengerMock()
+        self.package_manager = MasterTest.PackageManagerMock(force_rebuild=False)
+        self.master = BrokerMaster(self.data_master,
+                                   self.kolejka_messenger,
+                                   self.baca_messenger,
+                                   self.package_manager,
+                                   self.logger)
+        self.handlers = ActiveHandler(self.master, self.master.kolejka_messenger, self.logger)
+
+    def tearDown(self):
+        self.logger_manager.stop()
+        with open(self.test_dir / 'test.log') as f:
+            print(f.read())
+        os.remove(self.test_dir / 'test.log')
+
+    def test_handler(self):
+        btb = BacaToBroker(pass_hash='x',
+                           submit_id='submit1',
+                           package_path=self.package_path,
+                           commit_id='1',
+                           submit_path=self.submit_path)
+        asyncio.run(self.handlers.handle_baca(btb))
+        set_submit = self.kolejka_messenger.processed[0]
+        self.assertIsNotNone(set_submit.get_result())
+
+    def test_handler_error(self):
+        btb = BacaToBroker(pass_hash='x',
+                           submit_id='submit1',
+                           package_path=self.package_path,
+                           commit_id='1',
+                           submit_path=self.submit_path)
+        self.kolejka_messenger.raise_exception = True
+        self.assertRaises(Exception, asyncio.run, self.handlers.handle_baca(btb))
 
 
 if __name__ == '__main__':
