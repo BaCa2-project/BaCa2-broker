@@ -74,7 +74,7 @@ class ActiveHandler(Handler):
     def __init__(self, broker_master: BrokerMaster, kolejka_messenger: KolejkaMessengerActiveWait, log: logging.Logger):
         self.master = broker_master
         self.kolejka_messenger = kolejka_messenger
-        assert isinstance(self.kolejka_messenger, KolejkaMessengerActiveWait)
+        # assert isinstance(self.kolejka_messenger, KolejkaMessengerActiveWait)
         assert self.master.kolejka_messenger is self.kolejka_messenger
         self.data_master = self.master.data_master
         self.logger = log

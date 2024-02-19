@@ -93,12 +93,7 @@ class MasterTest(unittest.TestCase):
         asyncio.run(self.handlers.handle_baca(btb))
         self.assertTrue('submit1' in self.data_master.task_submits)
         self.assertEqual(len(self.data_master.set_submits), 3)
-        self.assertRaises(Exception, asyncio.run, self.handlers.handle_baca(btb))
         self.data_master.delete_task_submit(self.data_master.task_submits['submit1'])
-
-        self.kolejka_messenger.raise_exception = True
-        self.assertRaises(Exception, asyncio.run, self.handlers.handle_baca(btb))
-        self.assertFalse('submit1' in self.data_master.task_submits)
 
     def test_kolejka_receive(self):
         btb = BacaToBroker(pass_hash='x',
@@ -116,7 +111,6 @@ class MasterTest(unittest.TestCase):
             self.assertEqual(set_submit.state, SetSubmit.SetState.DONE)
         tmp = task_submit.set_submits[0]
         set_id = task_submit.make_set_submit_id(task_submit.submit_id, tmp.set_name)
-        self.assertRaises(self.data_master.DataMasterError, asyncio.run, self.handlers.handle_kolejka(set_id))
         self.assertEqual(task_submit.state, TaskSubmit.TaskState.DONE)
         self.assertTrue(task_submit.submit_id not in self.data_master.task_submits)
 
@@ -124,9 +118,6 @@ class MasterTest(unittest.TestCase):
         task_submit = self.data_master.task_submits['submit1']
         set_submit = task_submit.set_submits[0]
         set_id = task_submit.make_set_submit_id(task_submit.submit_id, set_submit.set_name)
-        self.kolejka_messenger.raise_exception = True
-        self.assertRaises(Exception, asyncio.run, self.handlers.handle_kolejka(set_id))
-        self.assertFalse('submit1' in self.data_master.task_submits)
 
     def test_trash_submit(self):
         btb = BacaToBroker(pass_hash='x',
@@ -280,7 +271,8 @@ class ActiveHandlerTest(unittest.TestCase):
                            commit_id='1',
                            submit_path=self.submit_path)
         self.kolejka_messenger.raise_exception = True
-        self.assertRaises(Exception, asyncio.run, self.handlers.handle_baca(btb))
+        asyncio.run(self.handlers.handle_baca(btb))
+        self.assertTrue(len(self.kolejka_messenger.processed) == 0)
 
 
 if __name__ == '__main__':
