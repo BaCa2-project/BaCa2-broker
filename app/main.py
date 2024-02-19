@@ -7,7 +7,7 @@ import settings
 
 from .broker.master import BrokerMaster
 from .broker.datamaster import DataMaster, SetSubmit, TaskSubmit
-from .broker.messenger import KolejkaMessenger, BacaMessenger, PackageManager
+from .broker.messenger import KolejkaMessenger, BacaMessenger, PackageManager, KolejkaMessengerActiveWait
 from .handlers import PassiveHandler, ActiveHandler
 from .logger import LoggerManager
 
@@ -23,22 +23,27 @@ logger = logger_manager.logger
 data_master = DataMaster(
     task_submit_t=TaskSubmit,
     set_submit_t=SetSubmit,
-    logger=logger.getChild('datamaster')
+    logger=logger
 )
 
-kolejka_messanger = KolejkaMessenger(
+if settings.ACTIVE_WAIT:
+    tmp_t = KolejkaMessengerActiveWait
+else:
+    tmp_t = KolejkaMessenger
+
+kolejka_messanger = tmp_t(
     submits_dir=settings.SUBMITS_DIR,
     build_namespace=settings.BUILD_NAMESPACE,
     kolejka_conf=settings.KOLEJKA_CONF,
     kolejka_callback_url_prefix=settings.KOLEJKA_CALLBACK_URL_PREFIX,
-    logger=logger.getChild('kolejka_messenger')
+    logger=logger
 )
 
 baca_messanger = BacaMessenger(
     baca_success_url=settings.BACA_RESULTS_URL,
     baca_failure_url=settings.BACA_ERROR_URL,
     password=settings.BACA_PASSWORD,
-    logger=logger.getChild('baca_messenger')
+    logger=logger
 )
 
 package_manager = PackageManager(
@@ -52,7 +57,7 @@ master = BrokerMaster(
     kolejka_messenger=kolejka_messanger,
     baca_messenger=baca_messanger,
     package_manager=package_manager,
-    logger=logger.getChild('master')
+    logger=logger
 )
 
 if settings.ACTIVE_WAIT:
@@ -94,6 +99,11 @@ class Content(BaseModel):
     package_path: str
     commit_id: str
     submit_path: str
+
+
+@app.get("/")
+async def root():
+    return {"message": "Broker is running"}
 
 
 @app.post("/baca")

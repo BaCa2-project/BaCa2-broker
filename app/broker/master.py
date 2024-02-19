@@ -51,16 +51,24 @@ class BrokerMaster:
 
     async def process_finished_set_submit(self, set_submit: SetSubmitInterface):
         async with set_submit.lock:
+            send_time = set_submit.mod_date
             set_submit.change_state(set_submit.SetState.DONE,
                                     requires=set_submit.SetState.AWAITING_KOLEJKA)
             await self.kolejka_messenger.get_results(set_submit)
+            self.logger.log(logging.INFO,
+                            "Set submit '%s' finished in %s",
+                            set_submit.submit_id, set_submit.mod_date - send_time)
 
     async def process_finished_task_submit(self, task_submit: TaskSubmitInterface):
         if not task_submit.all_checked():
             raise ValueError("Not all sets checked")
+        send_time = task_submit.mod_date
         task_submit.change_state(task_submit.TaskState.DONE,
                                  requires=task_submit.TaskState.AWAITING_SETS)
         await self.baca_messenger.send(task_submit)
+        self.logger.log(logging.INFO,
+                        "Task submit '%s' finished in %s",
+                        task_submit.submit_id, task_submit.mod_date - send_time)
         self.data_master.delete_task_submit(task_submit)
 
     async def process_package(self, package: Package):

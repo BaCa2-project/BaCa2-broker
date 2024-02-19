@@ -12,7 +12,7 @@ packages = [{include = "app"}]
 [tool.poetry.dependencies]
 python = "^3.11"
 pyyaml = "^6.0.1"
-baca2-package-manager = "^0.2.16"
+baca2-package-manager = "^0.3.3"
 requests = "^2.31.0"
 fastapi = "^0.109.2"
 python-dotenv = "^1.0.0"
@@ -20,6 +20,7 @@ coverage = "^7.3.2"
 parameterized = "^0.9.0"
 aiohttp = "^3.9.3"
 uvicorn = "^0.27.0"
+httpx = "^0.26.0"
 
 [build-system]
 requires = ["poetry-core"]
