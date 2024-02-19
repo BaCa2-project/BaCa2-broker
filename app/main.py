@@ -15,7 +15,7 @@ from .logger import LoggerManager
 # APP ===================================================================================
 
 
-logger_manager = LoggerManager('app', settings.LOG_FILE, 0)
+logger_manager = LoggerManager(__name__, settings.LOG_FILE, 0)
 logger_manager.set_formatter(settings.LOGGER_PROMPT)
 logger_manager.start()
 logger = logger_manager.logger

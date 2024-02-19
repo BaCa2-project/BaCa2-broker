@@ -66,7 +66,6 @@ class KolejkaMessenger(KolejkaMessengerInterface):
         try:
             await self._send_inner(set_submit)
         except Exception as e:
-            # await self.logger.error(str(e))
             raise self.KolejkaCommunicationError("Cannot communicate with KOLEJKA.") from e
 
     async def _send_inner(self, set_submit: SetSubmitInterface):
@@ -245,14 +244,12 @@ class BacaMessenger(BacaMessengerInterface):
         try:
             return await self._send_to_baca(task_submit, self.baca_success_url, self.password)
         except Exception as e:
-            self.logger.error(str(e))
             raise self.BacaMessengerError("Cannot communicate with baCa2.") from e
 
     async def send_error(self, task_submit: TaskSubmitInterface, error: Exception) -> bool:
         try:
             return await self._send_error_to_baca(task_submit, str(error), self.baca_failure_url, self.password)
-        except Exception as e:
-            self.logger.error(str(e))
+        except aiohttp.ClientError:
             return False
 
     @staticmethod

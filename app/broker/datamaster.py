@@ -328,10 +328,17 @@ class DataMaster(DataMasterInterface):
         return self.task_submits[submit_id]
 
     async def deletion_daemon_body(self, task_submit_timeout: timedelta):
+        self.logger.log(logging.INFO, "Running deletion daemon")
         to_be_deleted = []
         for task_submit in self.task_submits.values():
             if task_submit.mod_date - task_submit.creation_date >= task_submit_timeout:
                 to_be_deleted.append(task_submit)
+
+        if to_be_deleted:
+            self.logger.info("Found %s old submits that will now be deleted: %s",
+                             len(to_be_deleted), [sub.submit_id for sub in to_be_deleted])
+        else:
+            self.logger.info("No old submits to delete")
 
         for task_submit in to_be_deleted:
             task_submit.change_state(task_submit.TaskState.ERROR, requires=None)
