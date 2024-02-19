@@ -28,3 +28,5 @@ class LoggerManager:
 
     def stop(self):
         self.queue_listener.stop()
+        self.rot_handler.close()
+        self.queue_handler.close()

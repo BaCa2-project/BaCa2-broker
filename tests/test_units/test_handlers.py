@@ -6,6 +6,7 @@ from pathlib import Path
 from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import SetResult, BacaToBroker
 
+import settings
 from app.broker import BrokerMaster
 from app.broker.datamaster import DataMaster, SetSubmit, TaskSubmit, SetSubmitInterface, TaskSubmitInterface
 from app.broker.messenger import KolejkaMessengerInterface, BacaMessengerInterface, PackageManagerInterface
@@ -63,7 +64,7 @@ class MasterTest(unittest.TestCase):
         self.submit_path = self.resource_dir / '1' / '1' / 'prog' / 'solution.cpp'
 
         self.logger_manager = LoggerManager('test', self.test_dir / 'test.log', 0)
-        self.logger_manager.set_formatter('%(filename)s:%(lineno)d: %(message)s')
+        self.logger_manager.set_formatter(settings.LOGGER_PROMPT)
         self.logger_manager.start()
         self.logger = self.logger_manager.logger
         self.data_master = DataMaster(TaskSubmit, SetSubmit, self.logger)

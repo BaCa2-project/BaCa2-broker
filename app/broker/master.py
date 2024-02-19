@@ -56,6 +56,8 @@ class BrokerMaster:
             await self.kolejka_messenger.get_results(set_submit)
 
     async def process_finished_task_submit(self, task_submit: TaskSubmitInterface):
+        if not task_submit.all_checked():
+            raise ValueError("Not all sets checked")
         task_submit.change_state(task_submit.TaskState.DONE,
                                  requires=task_submit.TaskState.AWAITING_SETS)
         await self.baca_messenger.send(task_submit)

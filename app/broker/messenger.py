@@ -207,12 +207,12 @@ class KolejkaMessengerActiveWait(KolejkaMessenger):
         result_future = await asyncio.create_subprocess_shell(
             subprocess.list2cmdline(cmd_client_active_wait),
             stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL
+            stderr=asyncio.subprocess.PIPE
         )
-        await result_future.wait()
+        _, stderr = await result_future.communicate()
 
         if result_future.returncode != 0:
-            raise self.KolejkaCommunicationError('KOLEJKA client failed to get results.')
+            raise self.KolejkaCommunicationError(f'KOLEJKA client failed to get results. stderr: {stderr.decode()}')
 
         results = self._parse_results(set_submit, result_dir)
         return results
