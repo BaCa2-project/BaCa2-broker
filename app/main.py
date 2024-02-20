@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from pydantic import BaseModel
@@ -65,29 +66,28 @@ if settings.ACTIVE_WAIT:
 else:
     handlers = PassiveHandler(master, logger)
 
-app = FastAPI()
 daemons = set()
 
 
-# BEFORE SHUTDOWN AND STARTUP ===========================================================
-
-@app.on_event("startup")
-async def start_daemons():
+@asynccontextmanager
+async def lifespan(app_: FastAPI):
+    # start daemons
     task = asyncio.create_task(data_master.start_daemons(task_submit_timeout=settings.TASK_SUBMIT_TIMEOUT,
                                                          interval=settings.DELETION_DAEMON_INTERVAL))
     daemons.add(task)
 
+    yield
 
-@app.on_event("shutdown")
-async def stop_daemons():
+    # stop daemons
     for task in daemons:
         task.cancel()
     await asyncio.gather(*daemons, return_exceptions=True)
 
-
-@app.on_event("shutdown")
-async def stop_logger():
+    # stop logger
     logger_manager.stop()
+
+
+app = FastAPI(title='BaCa2-broker', lifespan=lifespan)
 
 
 # VIEWS =================================================================================
