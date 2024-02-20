@@ -26,6 +26,9 @@ class SystemTest(unittest.TestCase):
         self.package_path = self.resource_dir / '1'
         self.submit_path = self.resource_dir / '1' / '1' / 'prog' / 'solution.cpp'
 
+    def tearDown(self):
+        self.server_thread.join()
+
     def test(self):
         futures: list[cf.Future] = []
         with cf.ThreadPoolExecutor() as executor:
@@ -44,7 +47,6 @@ class SystemTest(unittest.TestCase):
                 cf.wait(futures)
                 for f in futures:
                     self.assertEqual(f.result().status_code, 200)
-            sleep(10)
 
 
 if __name__ == '__main__':

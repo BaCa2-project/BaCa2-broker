@@ -6,6 +6,7 @@ import sys
 from abc import ABC, abstractmethod
 from copy import deepcopy
 import asyncio
+from datetime import datetime
 from pathlib import Path
 import logging
 
@@ -64,7 +65,9 @@ class KolejkaMessenger(KolejkaMessengerInterface):
 
     async def send(self, set_submit: SetSubmitInterface):
         try:
+            start = datetime.now()
             await self._send_inner(set_submit)
+            self.logger.debug("Sending submit '%s' lasted %s", set_submit.submit_id, datetime.now() - start)
         except Exception as e:
             raise self.KolejkaCommunicationError("Cannot communicate with KOLEJKA.") from e
 
@@ -112,8 +115,11 @@ class KolejkaMessenger(KolejkaMessengerInterface):
 
     async def get_results(self, set_submit: SetSubmitInterface):
         try:
+            start = datetime.now()
             results = await self._get_results_inner(set_submit, set_submit.get_status_code())
             set_submit.set_result(results)
+            self.logger.debug("Retrieving results of submit '%s' lasted %s",
+                              set_submit.submit_id, datetime.now() - start)
         except Exception as e:
             self.logger.error(str(e))
             raise self.KolejkaCommunicationError("Cannot communicate with KOLEJKA.") from e
