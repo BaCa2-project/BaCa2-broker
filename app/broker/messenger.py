@@ -1,3 +1,4 @@
+"""Module for communication with KOLEJKA and BaCa2 and package managing."""
 import os
 import shutil
 import stat
@@ -22,20 +23,24 @@ from .yaml_tags import get_loader
 
 
 class KolejkaMessengerInterface(ABC):
+    """Interface for KOLEJKA communication."""
 
     class KolejkaCommunicationError(Exception):
         pass
 
     @abstractmethod
     async def send(self, set_submit: SetSubmitInterface):
+        """Sends set submit to KOLEJKA."""
         pass
 
     @abstractmethod
     async def get_results(self, set_submit: SetSubmitInterface):
+        """Retrieves results of set submit from KOLEJKA."""
         pass
 
 
 class KolejkaMessenger(KolejkaMessengerInterface):
+    """Class for KOLEJKA communication for when ACTIVE_WAIT is disabled."""
 
     def __init__(self,
                  submits_dir: Path,
@@ -166,6 +171,7 @@ class KolejkaMessenger(KolejkaMessengerInterface):
 
 
 class KolejkaMessengerActiveWait(KolejkaMessenger):
+    """Class for KOLEJKA communication for when ACTIVE_WAIT is enabled."""
 
     async def _send_inner(self, set_submit: SetSubmitInterface):
         task_submit = set_submit.task_submit
@@ -194,7 +200,7 @@ class KolejkaMessengerActiveWait(KolejkaMessenger):
         set_submit.set_result(await self.results_task(set_submit))
 
     async def get_results(self, set_submit: SetSubmitInterface):
-        pass
+        pass  # results are retrieved in send
 
     async def results_task(self, set_submit: SetSubmitInterface) -> SetResult:
         task_submit = set_submit.task_submit
@@ -225,16 +231,19 @@ class KolejkaMessengerActiveWait(KolejkaMessenger):
 
 
 class BacaMessengerInterface(ABC):
+    """Interface for BaCa2 communication."""
 
     class BacaMessengerError(Exception):
         pass
 
     @abstractmethod
     async def send(self, task_submit: TaskSubmitInterface):
+        """Sends task submit to BaCa2."""
         pass
 
     @abstractmethod
     async def send_error(self, task_submit: TaskSubmitInterface, error: Exception) -> bool:
+        """Sends error message to BaCa2."""
         pass
 
 
@@ -293,16 +302,19 @@ class BacaMessenger(BacaMessengerInterface):
 
 
 class PackageManagerInterface(ABC):
+    """Interface for package management."""
 
     def __init__(self, force_rebuild: bool):
         self.force_rebuild = force_rebuild
 
     @abstractmethod
     async def check_build(self, package: Package) -> bool:
+        """Checks if package needs to be rebuilt."""
         pass
 
     @abstractmethod
     async def build_package(self, package: Package):
+        """Builds package."""
         pass
 
 

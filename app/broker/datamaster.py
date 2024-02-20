@@ -1,3 +1,4 @@
+"""Data management"""
 import asyncio
 import logging
 from abc import ABC, abstractmethod
@@ -11,10 +12,12 @@ from baca2PackageManager.broker_communication import BrokerToBaca, SetResult
 
 
 class StateError(Exception):
+    """Raised when state change is illegal."""
     pass
 
 
 class SetSubmitInterface(ABC):
+    """Set submit data storage and management class."""
 
     class SetState(Enum):
         INITIAL = 0
@@ -34,9 +37,10 @@ class SetSubmitInterface(ABC):
         self.mod_date = self.creation_date
         self.lock = asyncio.Lock()
         # data fields
-        self.set_name = set_name
+        self.set_name = set_name  # not the same as submit_id
 
     def change_state(self, new_state: SetState, requires: SetState | list[SetState] | None):
+        """Changes state of set submit. If requires is not None, raises StateError if state change is illegal."""
         if requires is not None:
             try:
                 self.requires(requires)
@@ -51,6 +55,7 @@ class SetSubmitInterface(ABC):
         self.state = new_state
 
     def requires(self, states: SetState | list[SetState]):
+        """Checks if state change is legal. If not, raises StateError."""
         if isinstance(states, self.SetState):
             states = [states]
         if self.state not in states:
@@ -58,22 +63,27 @@ class SetSubmitInterface(ABC):
 
     @property
     def submit_id(self) -> str:
+        """Submit_id of set submit."""
         return self.task_submit.make_set_submit_id(self.task_submit.submit_id, self.set_name)
 
     @abstractmethod
     def set_result(self, result: SetResult):
+        """Sets result of set submit. To be used only by baca messenger."""
         pass
 
     @abstractmethod
     def get_result(self) -> SetResult:
+        """Gets result of set submit. To be used only by kolejka messenger."""
         pass
 
     @abstractmethod
     def set_status_code(self, status_code: str):
+        """Sets status code of set submit. To be used only by kolejka messenger."""
         pass
 
     @abstractmethod
     def get_status_code(self) -> str:
+        """Gets status code of set submit. To be used only by kolejka messenger."""
         pass
 
 
@@ -105,6 +115,7 @@ class SetSubmit(SetSubmitInterface):
 
 
 class TaskSubmitInterface(ABC):
+    """Task submit data storage and management class."""
 
     class TaskState(Enum):
         INITIAL = 0
@@ -131,6 +142,7 @@ class TaskSubmitInterface(ABC):
         self.submit_path = submit_path
 
     def change_state(self, new_state: TaskState, requires: TaskState | list[TaskState] | None):
+        """Changes state of task submit. If requires is not None, checks if state change is legal."""
         if requires is not None:
             try:
                 self.requires(requires)
@@ -145,6 +157,7 @@ class TaskSubmitInterface(ABC):
         self.state = new_state
 
     def requires(self, states: TaskState | list[TaskState]):
+        """Checks if state change is legal. If not, raises StateError."""
         if isinstance(states, self.TaskState):
             states = [states]
         if self.state not in states:
@@ -152,35 +165,42 @@ class TaskSubmitInterface(ABC):
 
     def change_set_states(self, new_state: SetSubmit.SetState,
                           requires: SetSubmit.SetState | list[SetSubmit.SetState] | None):
+        """Changes state of all set submits of task submit."""
         for set_submit in self.set_submits:
             set_submit.change_state(new_state, requires)
 
     @staticmethod
     @abstractmethod
     def make_set_submit_id(task_submit_id: str, set_name: str) -> str:
+        """Makes set submit id from task submit id and set name."""
         pass
 
     @abstractmethod
     async def initialise(self):
+        """Performs initialisation of async data fields."""
         pass
 
     @abstractmethod
     def all_checked(self) -> bool:
+        """Checks if all set submits are done."""
         pass
 
     @property
     @abstractmethod
     def package(self) -> Package:
+        """Package of task submit."""
         pass
 
     @property
     @abstractmethod
     def set_submits(self) -> list[SetSubmitInterface]:
+        """List of set submits of task submit."""
         pass
 
     @property
     @abstractmethod
     def results(self) -> list[BrokerToBaca]:
+        """List of results of set submits of task submit."""
         pass
 
 
@@ -235,6 +255,7 @@ class TaskSubmit(TaskSubmitInterface):
 
 
 class DataMasterInterface(ABC):
+    """Data management class."""
 
     class DataMasterError(Exception):
         pass
@@ -249,6 +270,7 @@ class DataMasterInterface(ABC):
 
     @abstractmethod
     def new_set_submit(self, task_submit: 'TaskSubmitInterface', set_name: str) -> SetSubmitInterface:
+        """Creates new set submit and adds it to database."""
         pass
 
     @abstractmethod
@@ -257,21 +279,26 @@ class DataMasterInterface(ABC):
                         package_path: Path,
                         commit_id: str,
                         submit_path: Path) -> TaskSubmitInterface:
+        """Creates new task submit and adds it to database."""
         pass
 
     @abstractmethod
     def delete_task_submit(self, task_submit: TaskSubmitInterface):
+        """Deletes task submit from database and all its set submits."""
         pass
 
     @abstractmethod
     def get_set_submit(self, submit_id: str) -> SetSubmitInterface:
+        """Gets set submit from database by submit_id."""
         pass
 
     @abstractmethod
     def get_task_submit(self, submit_id: str) -> TaskSubmitInterface:
+        """Gets task submit from database by submit_id."""
         pass
 
     async def start_daemons(self, *args, **kwargs):
+        """Starts daemons."""
         pass
 
 

@@ -1,3 +1,4 @@
+"""Background handlers for incoming messages from BaCa2 and Kolejka"""
 from abc import ABC, abstractmethod
 import logging
 from pathlib import Path
@@ -9,6 +10,7 @@ from .broker.master import BrokerMaster
 
 
 class Handler(ABC):
+    """Abstract class for handling incoming messages from BaCa2 and Kolejka."""
 
     @abstractmethod
     async def handle_baca(self, data: BacaToBroker):
@@ -16,6 +18,7 @@ class Handler(ABC):
 
 
 class PassiveHandler(Handler):
+    """Handler class for broker when ACTIVE_WAIT is disabled."""
 
     def __init__(self, broker_master: BrokerMaster, log: logging.Logger):
         self.master = broker_master
@@ -69,6 +72,7 @@ class PassiveHandler(Handler):
 
 
 class ActiveHandler(Handler):
+    """Handler class for broker when ACTIVE_WAIT is enabled."""
 
     def __init__(self, broker_master: BrokerMaster, kolejka_messenger: KolejkaMessengerActiveWait, log: logging.Logger):
         self.master = broker_master
@@ -98,7 +102,8 @@ class ActiveHandler(Handler):
                              data.submit_id)
             await self.master.process_finished_task_submit(task_submit)
         except Exception as e:
-            self.logger.error("Error while processing task submit '%s': %s", data.submit_id, str(e), exc_info=True)
+            self.logger.error("Error while processing task submit '%s': %s",
+                              data.submit_id, str(e), exc_info=True)
             await self.master.trash_task_submit(task_submit, e)
             return
         else:

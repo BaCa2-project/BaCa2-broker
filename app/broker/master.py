@@ -1,3 +1,4 @@
+"""Main class for handling broker's logic."""
 import asyncio
 import logging
 
@@ -8,6 +9,7 @@ from .datamaster import DataMasterInterface, SetSubmitInterface, TaskSubmitInter
 
 
 class BrokerMaster:
+    """Main class for handling broker's logic."""
 
     def __init__(self,
                  data_master: DataMasterInterface,
@@ -22,6 +24,7 @@ class BrokerMaster:
         self.logger = logger
 
     async def process_new_task_submit(self, task_submit: TaskSubmitInterface):
+        """Sends all sets to kolejka and changes state of task submit to AWAITING_SETS."""
 
         async def kolejka_send_task(set_submit: SetSubmitInterface):
             async with set_submit.lock:
@@ -37,6 +40,7 @@ class BrokerMaster:
             await asyncio.gather(*tasks)
 
     async def trash_task_submit(self, task_submit: TaskSubmitInterface, error: Exception):
+        """Changes state of task submit to ERROR, sends error message to BaCa2 and deletes task submit from database."""
         self.logger.info("Trashing task submit '%s'", task_submit.submit_id)
         async with task_submit.lock:
             task_submit.change_state(task_submit.TaskState.ERROR, requires=None)
@@ -45,6 +49,7 @@ class BrokerMaster:
             await self.baca_messenger.send_error(task_submit, str(error))
 
     async def process_finished_set_submit(self, set_submit: SetSubmitInterface):
+        """Gets results from kolejka and changes state of set submit to DONE."""
         async with set_submit.lock:
             set_submit.change_state(set_submit.SetState.DONE,
                                     requires=set_submit.SetState.AWAITING_KOLEJKA)
@@ -53,6 +58,7 @@ class BrokerMaster:
                              set_submit.submit_id, set_submit.mod_date - set_submit.creation_date)
 
     async def process_finished_task_submit(self, task_submit: TaskSubmitInterface):
+        """Sends task submit to BaCa2 and deletes it from database. All set submits must be checked before calling."""
         if not task_submit.all_checked():
             raise ValueError("Not all sets checked")
         task_submit.change_state(task_submit.TaskState.DONE,
@@ -63,6 +69,7 @@ class BrokerMaster:
         self.data_master.delete_task_submit(task_submit)
 
     async def process_package(self, package: Package):
+        """Builds package if needed."""
         if not await self.package_manager.check_build(package) or self.package_manager.force_rebuild:
             self.logger.info("Building package '%s'", package.name)
             await self.package_manager.build_package(package)
