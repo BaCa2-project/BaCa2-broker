@@ -131,12 +131,12 @@ class KolejkaMessenger(KolejkaMessengerInterface):
         result_future = await asyncio.create_subprocess_shell(
             subprocess.list2cmdline(result_get),
             stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL
+            stderr=asyncio.subprocess.PIPE
         )
-        await result_future.wait()
+        _, stderr = await result_future.communicate()
 
         if result_future.returncode != 0:
-            raise self.KolejkaCommunicationError('KOLEJKA client failed to get results.')
+            raise self.KolejkaCommunicationError(f'KOLEJKA client failed to get results; stderr:\n{stderr.decode()}')
 
         return self._parse_results(set_submit, result_dir)
 
@@ -183,7 +183,7 @@ class KolejkaMessengerActiveWait(KolejkaMessenger):
         _, stderr = await judge_future.communicate()
 
         if judge_future.returncode != 0:
-            raise self.KolejkaCommunicationError(f'KOLEJKA judge failed to create task; stderr: {stderr}')
+            raise self.KolejkaCommunicationError(f'KOLEJKA judge failed to create task; stderr:\n{stderr.decode()}')
 
         set_submit.set_result(await self.results_task(set_submit))
 
@@ -212,7 +212,7 @@ class KolejkaMessengerActiveWait(KolejkaMessenger):
         _, stderr = await result_future.communicate()
 
         if result_future.returncode != 0:
-            raise self.KolejkaCommunicationError(f'KOLEJKA client failed to get results. stderr: {stderr.decode()}')
+            raise self.KolejkaCommunicationError(f'KOLEJKA client failed to get results; stderr:\n{stderr.decode()}')
 
         results = self._parse_results(set_submit, result_dir)
         return results
