@@ -50,7 +50,7 @@ baca_messanger = BacaMessenger(
 package_manager = PackageManager(
     kolejka_src_dir=settings.KOLEJKA_SRC_DIR,
     build_namespace=settings.BUILD_NAMESPACE,
-    force_rebuild=False,
+    force_rebuild=settings.FORCE_REBUILD_PACKAGE,
 )
 
 master = BrokerMaster(
