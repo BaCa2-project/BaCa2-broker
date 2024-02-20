@@ -45,8 +45,8 @@ class SetSubmitInterface(ABC):
                        % (self.submit_id, self.state.name, new_state.name, requires))
                 self.master.logger.error(msg)
                 raise StateError(msg)
-        self.master.logger.log(logging.INFO, "State of set_submit '%s': %s -> %s",
-                               self.submit_id, self.state.name, new_state.name)
+        self.master.logger.info("State of set_submit '%s': %s -> %s",
+                                self.submit_id, self.state.name, new_state.name)
         self.mod_date = datetime.now()
         self.state = new_state
 
@@ -139,8 +139,8 @@ class TaskSubmitInterface(ABC):
                        % (self.submit_id, self.state.name, new_state.name, requires))
                 self.master.logger.error(msg)
                 raise StateError(msg)
-        self.master.logger.log(logging.INFO, "State of task_submit '%s': %s -> %s",
-                               self.submit_id, self.state.name, new_state.name)
+        self.master.logger.info("State of task_submit '%s': %s -> %s",
+                                self.submit_id, self.state.name, new_state.name)
         self.mod_date = datetime.now()
         self.state = new_state
 
@@ -328,7 +328,7 @@ class DataMaster(DataMasterInterface):
         return self.task_submits[submit_id]
 
     async def deletion_daemon_body(self, task_submit_timeout: timedelta):
-        self.logger.log(logging.INFO, "Running deletion daemon")
+        self.logger.info("Running deletion daemon")
         to_be_deleted = []
         for task_submit in self.task_submits.values():
             if task_submit.mod_date - task_submit.creation_date >= task_submit_timeout:

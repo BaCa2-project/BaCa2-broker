@@ -33,16 +33,11 @@ class BrokerMaster:
 
         async with task_submit.lock:
             task_submit.change_state(task_submit.TaskState.AWAITING_SETS, requires=task_submit.TaskState.INITIAL)
-            async with asyncio.TaskGroup() as tg:
-                tasks = [tg.create_task(kolejka_send_task(s), name=s.submit_id) for s in task_submit.set_submits]
-
-        if not all(t.done() for t in tasks):
-            msg = "Not all tasks finished (this should never happen)"
-            self.logger.critical(msg, extra={t.get_name(): t.get_stack() for t in tasks})
-            raise RuntimeError(msg)
+            tasks = [kolejka_send_task(s) for s in task_submit.set_submits]
+            await asyncio.gather(*tasks)
 
     async def trash_task_submit(self, task_submit: TaskSubmitInterface, error: Exception):
-        self.logger.debug("Trashing task submit '%s'", task_submit.submit_id)
+        self.logger.info("Trashing task submit '%s'", task_submit.submit_id)
         async with task_submit.lock:
             task_submit.change_state(task_submit.TaskState.ERROR, requires=None)
             task_submit.change_set_states(SetSubmitInterface.SetState.ERROR, requires=None)
@@ -51,28 +46,24 @@ class BrokerMaster:
 
     async def process_finished_set_submit(self, set_submit: SetSubmitInterface):
         async with set_submit.lock:
-            send_time = set_submit.mod_date
             set_submit.change_state(set_submit.SetState.DONE,
                                     requires=set_submit.SetState.AWAITING_KOLEJKA)
             await self.kolejka_messenger.get_results(set_submit)
-            self.logger.log(logging.INFO,
-                            "Set submit '%s' finished in %s",
-                            set_submit.submit_id, set_submit.mod_date - send_time)
+            self.logger.info("Set submit '%s' finished in %s",
+                             set_submit.submit_id, set_submit.mod_date - set_submit.creation_date)
 
     async def process_finished_task_submit(self, task_submit: TaskSubmitInterface):
         if not task_submit.all_checked():
             raise ValueError("Not all sets checked")
-        send_time = task_submit.mod_date
         task_submit.change_state(task_submit.TaskState.DONE,
                                  requires=task_submit.TaskState.AWAITING_SETS)
         await self.baca_messenger.send(task_submit)
-        self.logger.log(logging.INFO,
-                        "Task submit '%s' finished in %s",
-                        task_submit.submit_id, task_submit.mod_date - send_time)
+        self.logger.info("Task submit '%s' finished in %s",
+                         task_submit.submit_id, task_submit.mod_date - task_submit.creation_date)
         self.data_master.delete_task_submit(task_submit)
 
     async def process_package(self, package: Package):
         if not await self.package_manager.check_build(package) or self.package_manager.force_rebuild:
-            self.logger.log(logging.INFO, "Building package '%s'", package.name)
+            self.logger.info("Building package '%s'", package.name)
             await self.package_manager.build_package(package)
-            self.logger.log(logging.INFO, "Package '%s' built successfully", package.name)
+            self.logger.info("Package '%s' built successfully", package.name)

@@ -41,7 +41,7 @@ class PassiveHandler(Handler):
             await self.master.trash_task_submit(task_submit, e)
             return
         else:
-            self.logger.log(logging.INFO, "Task submit '%s' started successfully", data.submit_id)
+            self.logger.info("Task submit '%s' started successfully", data.submit_id)
 
     async def handle_kolejka(self, submit_id: str):
         try:
@@ -59,9 +59,8 @@ class PassiveHandler(Handler):
             task_submit = set_submit.task_submit
             async with task_submit.lock:
                 if task_submit.all_checked() and task_submit.state == task_submit.TaskState.AWAITING_SETS:
-                    self.logger.log(logging.INFO,
-                                    "All sets checked for task submit '%s', now sending to BaCa2",
-                                    task_submit.submit_id)
+                    self.logger.info("All sets checked for task submit '%s', now sending to BaCa2",
+                                     task_submit.submit_id)
                     await self.master.process_finished_task_submit(task_submit)
         except Exception as e:
             self.logger.error("Error while finishing task submit '%s': %s", submit_id, str(e))
@@ -95,13 +94,12 @@ class ActiveHandler(Handler):
             await self.master.process_new_task_submit(task_submit)
             for s in task_submit.set_submits:
                 await self.master.process_finished_set_submit(s)
-            self.logger.log(logging.INFO,
-                            "All sets checked for task submit '%s', now sending to BaCa2",
-                            data.submit_id)
+            self.logger.info("All sets checked for task submit '%s', now sending to BaCa2",
+                             data.submit_id)
             await self.master.process_finished_task_submit(task_submit)
         except Exception as e:
             self.logger.error("Error while processing task submit '%s': %s", data.submit_id, str(e), exc_info=True)
             await self.master.trash_task_submit(task_submit, e)
             return
         else:
-            self.logger.log(logging.INFO, "Task submit '%s' processed successfully", data.submit_id)
+            self.logger.info("Task submit '%s' processed successfully", data.submit_id)
