@@ -181,7 +181,7 @@ class TaskSubmit(Thread):
                         self.sets_statuses[SubmitState.DONE] +
                         self.sets_statuses[SubmitState.CANCELED])
         if self.sets_statuses[status] == len(self.sets) and status not in (
-        SubmitState.DONE, SubmitState.SAVING):
+                SubmitState.DONE, SubmitState.SAVING):
             self._change_state(status)
         elif end_statuses == len(self.sets):
             ok_statuses = self.sets_statuses[SubmitState.DONE]
@@ -398,14 +398,15 @@ class SetSubmit(Thread):
 
         judge_status = subprocess.run(cmd_judge)
         if judge_status.returncode != 0:
-            raise self.KOLEJKACommunicationFailed('KOLEJKA judge failed to create task.')
+            raise self.KOLEJKACommunicationFailed(
+                f'KOLEJKA judge failed to create task.\nTB:\n{judge_status.stderr}')
 
         client_status = subprocess.run(cmd_client, capture_output=True)
         self.result_code = client_status.stdout.decode('utf-8').strip()
 
         if client_status.returncode != 0:
             raise self.KOLEJKACommunicationFailed(
-                'KOLEJKA client failed to communicate with KOLEJKA server.')
+                f'KOLEJKA client failed to communicate with KOLEJKA server.\nTB:\n{client_status.stderr}')
         self.callback_status = CallbackStatus.SENT
 
     def results_get(self) -> bool:
