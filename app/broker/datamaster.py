@@ -251,7 +251,7 @@ class TaskSubmit(TaskSubmitInterface):
     def results(self) -> dict[str, SetResult]:
         if not self.all_checked():
             raise ValueError("Sets not filled")
-        return {s.submit_id: s.get_result() for s in self.set_submits}
+        return {s.set_name: s.get_result() for s in self.set_submits}
 
 
 class DataMasterInterface(ABC):
