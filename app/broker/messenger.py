@@ -272,7 +272,7 @@ class BacaMessenger(BacaMessengerInterface):
         message = BrokerToBaca(
             pass_hash=make_hash(password, task_submit.submit_id),
             submit_id=task_submit.submit_id,
-            results=deepcopy(task_submit.results),
+            results=deepcopy({result.submit_id: result for result in task_submit.results}),
         )
 
         async with aiohttp.ClientSession() as session:
