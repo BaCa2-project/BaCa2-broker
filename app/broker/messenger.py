@@ -267,14 +267,13 @@ class BacaMessenger(BacaMessengerInterface):
         except aiohttp.ClientError:
             return False
 
-    async def _send_to_baca(self, task_submit: TaskSubmitInterface, baca_url: str, password: str):
+    @staticmethod
+    async def _send_to_baca(task_submit: TaskSubmitInterface, baca_url: str, password: str):
         message = BrokerToBaca(
             pass_hash=make_hash(password, task_submit.submit_id),
             submit_id=task_submit.submit_id,
             results=deepcopy(task_submit.results),
         )
-        self.logger.debug("Sending task submit '%s' to baCa2 with content:\n%s",
-                          task_submit.submit_id, message.serialize())
 
         async with aiohttp.ClientSession() as session:
             async with session.post(url=baca_url, json=message.serialize()) as response:

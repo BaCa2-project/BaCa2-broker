@@ -2,6 +2,7 @@ import asyncio
 import os
 import unittest
 from pathlib import Path
+from random import random
 
 from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import SetResult, BacaToBroker
@@ -263,6 +264,22 @@ class ActiveHandlerTest(unittest.TestCase):
         asyncio.run(self.handlers.handle_baca(btb))
         set_submit = self.kolejka_messenger.processed[0]
         self.assertIsNotNone(set_submit.get_result())
+
+    # def test_handler_many(self):
+    #     async def tmp(t):
+    #         await asyncio.gather(*t)
+    #
+    #     tasks = []
+    #     for i in range(100):
+    #         btb = BacaToBroker(pass_hash='x',
+    #                            submit_id=f'submit{i}',
+    #                            package_path=self.package_path,
+    #                            commit_id='1',
+    #                            submit_path=self.submit_path)
+    #         tasks.append(self.handlers.handle_baca(btb))
+    #     asyncio.run(tmp(tasks))
+    #     # set_submit = self.kolejka_messenger.processed[0]
+    #     # self.assertIsNotNone(set_submit.get_result())
 
     def test_handler_error(self):
         btb = BacaToBroker(pass_hash='x',

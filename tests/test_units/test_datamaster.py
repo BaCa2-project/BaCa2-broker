@@ -208,7 +208,7 @@ class SubmitsTest(unittest.TestCase):
             set_submit.change_state(SetSubmit.SetState.DONE, requires=None)
             set_submit.set_result(result)
         self.assertEqual(self.task_submit.results,
-                         {set_submit.submit_id: result for set_submit in self.task_submit.set_submits})
+                         {set_submit.set_name: result for set_submit in self.task_submit.set_submits})
 
 
 if __name__ == '__main__':
