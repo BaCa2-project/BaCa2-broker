@@ -94,13 +94,13 @@ class SetSubmit(SetSubmitInterface):
                  task_submit: 'TaskSubmit',
                  set_name: str):
         super().__init__(master, task_submit, set_name)
-        self.result: Optional[BrokerToBaca] = None
+        self.result: Optional[SetResult] = None
         self.status_code: Optional[str] = None
 
-    def set_result(self, result: BrokerToBaca):
+    def set_result(self, result: SetResult):
         self.result = result
 
-    def get_result(self) -> BrokerToBaca:
+    def get_result(self) -> SetResult:
         if self.result is None:
             raise ValueError("No result available")
         return self.result
@@ -199,7 +199,7 @@ class TaskSubmitInterface(ABC):
 
     @property
     @abstractmethod
-    def results(self) -> list[BrokerToBaca]:
+    def results(self) -> dict[str, SetResult]:
         """List of results of set submits of task submit."""
         pass
 
@@ -248,10 +248,10 @@ class TaskSubmit(TaskSubmitInterface):
         return self._sets.copy()
 
     @property
-    def results(self) -> list[BrokerToBaca]:
+    def results(self) -> dict[str, SetResult]:
         if not self.all_checked():
             raise ValueError("Sets not filled")
-        return [s.get_result() for s in self.set_submits]
+        return {s.submit_id: s.get_result() for s in self.set_submits}
 
 
 class DataMasterInterface(ABC):
