@@ -3,8 +3,8 @@ from pathlib import Path
 
 from baca2PackageManager import Package, TSet, TestF
 from yaml import dump
+import settings
 
-from settings import BUILD_NAMESPACE, KOLEJKA_SRC_DIR, JUDGES
 from .yaml_tags import get_dumper, File
 
 INCLUDE_TAG = '0tag::include'
@@ -20,7 +20,7 @@ class Builder:
 
     def __init__(self, package: Package, enable_shortcut: bool = True) -> None:
         self.package = package
-        self.build_namespace = BUILD_NAMESPACE
+        self.build_namespace = settings.BUILD_NAMESPACE
         self.build_path = None
         self.enable_shortcut = enable_shortcut
         self.common_path = None
@@ -70,7 +70,8 @@ class Builder:
                     'execute_time_cpu': '/io/executor/run/cpu_time',
                     'execute_memory': '/io/executor/run/memory',
                     'compile_log': 'str:/builder/**/stdout,/builder/**/stderr',
-                    'tool_log': 'str:/io/generator/**/stderr,/io/verifier/**/stdout,/io/verifier/**/stderr,/io/hinter/**/stderr',
+                    'tool_log': 'str:/io/generator/**/stderr,/io/verifier/**/stdout,'
+                                '/io/verifier/**/stderr,/io/hinter/**/stderr',
                     'checker_log': 'str:/io/checker/**/stdout,/io/checker/**/stderr',
                     'logs': '/logs/logs',
                     'debug': '/debug/debug',
@@ -87,9 +88,9 @@ class Builder:
 
         self.to_yaml(test_yaml, self.common_path / 'test.yaml')
 
-        os.symlink(KOLEJKA_SRC_DIR / 'kolejka-judge', self.common_path / 'kolejka-judge')
-        os.symlink(KOLEJKA_SRC_DIR / 'kolejka-client', self.common_path / 'kolejka-client')
-        os.symlink(JUDGES[judge_type], self.common_path / 'judge.py')
+        os.symlink(settings.KOLEJKA_SRC_DIR / 'kolejka-judge', self.common_path / 'kolejka-judge')
+        os.symlink(settings.KOLEJKA_SRC_DIR / 'kolejka-client', self.common_path / 'kolejka-client')
+        os.symlink(settings.JUDGES[judge_type], self.common_path / 'judge.py')
 
     def build(self):
         self.build_path = self.package.prepare_build(self.build_namespace)
