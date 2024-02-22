@@ -2,13 +2,13 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 from enum import Enum
 from pathlib import Path
 
 from baca2PackageManager import Package
-from baca2PackageManager.broker_communication import BrokerToBaca, SetResult
+from baca2PackageManager.broker_communication import SetResult
 
 
 class StateError(Exception):
@@ -23,7 +23,8 @@ class SetSubmitInterface(ABC):
         INITIAL = 0
         SENDING_TO_KOLEJKA = 1
         AWAITING_KOLEJKA = 2
-        DONE = 3
+        WAITING_FOR_RESULTS = 3
+        DONE = 4
         ERROR = -1
 
     def __init__(self,
@@ -268,6 +269,18 @@ class DataMasterInterface(ABC):
         self.set_submit_t = set_submit_t
         self.logger = logger
 
+    @property
+    @abstractmethod
+    def task_submits(self) -> dict[str, TaskSubmitInterface]:
+        """Dictionary of task submits."""
+        pass
+
+    @property
+    @abstractmethod
+    def set_submits(self) -> dict[str, SetSubmitInterface]:
+        """Dictionary of set submits."""
+        pass
+
     @abstractmethod
     def new_set_submit(self, task_submit: 'TaskSubmitInterface', set_name: str) -> SetSubmitInterface:
         """Creates new set submit and adds it to database."""
@@ -297,10 +310,6 @@ class DataMasterInterface(ABC):
         """Gets task submit from database by submit_id."""
         pass
 
-    async def start_daemons(self, *args, **kwargs):
-        """Starts daemons."""
-        pass
-
 
 class DataMaster(DataMasterInterface):
 
@@ -309,8 +318,16 @@ class DataMaster(DataMasterInterface):
                  set_submit_t: type[SetSubmitInterface],
                  logger: logging.Logger):
         super().__init__(task_submit_t, set_submit_t, logger)
-        self.task_submits: dict[str, TaskSubmit] = {}
-        self.set_submits: dict[str, SetSubmit] = {}
+        self._task_submits: dict[str, TaskSubmit] = {}
+        self._set_submits: dict[str, SetSubmit] = {}
+
+    @property
+    def task_submits(self) -> dict[str, TaskSubmitInterface]:
+        return self._task_submits
+
+    @property
+    def set_submits(self) -> dict[str, SetSubmitInterface]:
+        return self._set_submits
 
     def new_task_submit(self,
                         task_submit_id: str,
@@ -353,29 +370,3 @@ class DataMaster(DataMasterInterface):
         if submit_id not in self.task_submits:
             raise self.DataMasterError(f"Task submit {submit_id} does not exist")
         return self.task_submits[submit_id]
-
-    async def deletion_daemon_body(self, task_submit_timeout: timedelta):
-        self.logger.info("Running deletion daemon")
-        to_be_deleted = []
-        for task_submit in self.task_submits.values():
-            if task_submit.mod_date - task_submit.creation_date >= task_submit_timeout:
-                to_be_deleted.append(task_submit)
-
-        if to_be_deleted:
-            self.logger.info("Found %s old submits that will now be deleted: %s",
-                             len(to_be_deleted), [sub.submit_id for sub in to_be_deleted])
-        else:
-            self.logger.info("No old submits to delete")
-
-        for task_submit in to_be_deleted:
-            task_submit.change_state(task_submit.TaskState.ERROR, requires=None)
-            task_submit.change_set_states(SetSubmitInterface.SetState.ERROR, requires=None)
-            self.delete_task_submit(task_submit)
-
-    async def deletion_daemon(self, task_submit_timeout: timedelta, interval: int):
-        while True:
-            await self.deletion_daemon_body(task_submit_timeout)
-            await asyncio.sleep(interval)
-
-    async def start_daemons(self, task_submit_timeout: timedelta, interval: int):
-        await asyncio.gather(self.deletion_daemon(task_submit_timeout, interval))

@@ -1,8 +1,8 @@
 import asyncio
 import os
 import unittest
+from datetime import timedelta
 from pathlib import Path
-from random import random
 
 from baca2PackageManager import Package
 from baca2PackageManager.broker_communication import SetResult, BacaToBroker
@@ -207,6 +207,32 @@ class MasterTest(unittest.TestCase):
         asyncio.run(run())
         self.assertTrue(len(self.data_master.task_submits) == 0)
         self.assertEqual(100, len(baca_messenger.processed))
+
+    def test_start_daemons(self):
+        async def inner():
+            task_submit_new = self.data_master.new_task_submit("submit_id_new",
+                                                               self.package_path,
+                                                               "1",
+                                                               self.submit_path)
+            await task_submit_new.initialise()
+            task_submit_old = self.data_master.new_task_submit("submit_id_old",
+                                                               self.package_path,
+                                                               "1",
+                                                               self.submit_path)
+            await task_submit_old.initialise()
+            task_submit_old.mod_date += timedelta(minutes=61)
+
+            task = asyncio.create_task(self.master.start_daemons(task_submit_timeout=timedelta(minutes=60),
+                                                                 interval=0))
+
+            await asyncio.sleep(0.1)
+            self.assertEqual(task_submit_old.state, TaskSubmit.TaskState.ERROR)
+            self.assertEqual(task_submit_new.state, TaskSubmit.TaskState.INITIAL)
+            self.assertEqual(len(self.data_master.task_submits), 1)
+            self.assertEqual(len(self.data_master.set_submits), 3)
+            task.cancel()
+
+        asyncio.run(inner())
 
 
 class ActiveHandlerTest(unittest.TestCase):

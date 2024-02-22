@@ -72,8 +72,8 @@ daemons = set()
 @asynccontextmanager
 async def lifespan(app_: FastAPI):
     # start daemons
-    task = asyncio.create_task(data_master.start_daemons(task_submit_timeout=settings.TASK_SUBMIT_TIMEOUT,
-                                                         interval=settings.DELETION_DAEMON_INTERVAL))
+    task = asyncio.create_task(master.start_daemons(task_submit_timeout=settings.TASK_SUBMIT_TIMEOUT,
+                                                    interval=settings.DELETION_DAEMON_INTERVAL))
     daemons.add(task)
 
     yield
