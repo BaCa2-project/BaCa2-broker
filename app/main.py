@@ -123,7 +123,7 @@ async def baca_post(content: Content, background_tasks: BackgroundTasks):
     return {"message": "Success", "status_code": 200}
 
 
-@app.post("/kolejka/{submit_id}")
+@app.get("/kolejka/{submit_id}")
 async def kolejka_post(submit_id: str, background_tasks: BackgroundTasks):
     """Handle notifications from kolejka"""
     if settings.ACTIVE_WAIT:
