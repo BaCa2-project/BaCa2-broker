@@ -123,7 +123,7 @@ async def baca_post(content: Content, background_tasks: BackgroundTasks):
     return {"message": "Success", "status_code": 200}
 
 
-@app.get("/kolejka/{submit_id}")
+@app.post("/kolejka/{submit_id}")
 async def kolejka_post(submit_id: str, background_tasks: BackgroundTasks):
     """Handle notifications from kolejka"""
     if settings.ACTIVE_WAIT:
@@ -134,6 +134,6 @@ async def kolejka_post(submit_id: str, background_tasks: BackgroundTasks):
     if not submit_normalized.isalnum():
         raise HTTPException(status_code=400)
 
-    background_tasks.add_task(handlers.handle_kolejka, submit_normalized)
+    background_tasks.add_task(handlers.handle_kolejka, submit_id)
 
     return {"message": "Success", "status_code": 200}

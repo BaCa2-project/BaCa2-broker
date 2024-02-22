@@ -40,7 +40,7 @@ class PassiveHandler(Handler):
             await self.master.process_package(task_submit.package)
             await self.master.process_new_task_submit(task_submit)
         except Exception as e:
-            self.logger.error("Error while processing task submit '%s': %s", data.submit_id, str(e))
+            self.logger.error("Error while processing task submit '%s': %s", data.submit_id, str(e), exc_info=True)
             await self.master.trash_task_submit(task_submit, e)
             return
         else:
@@ -50,12 +50,12 @@ class PassiveHandler(Handler):
         try:
             set_submit = self.data_master.get_set_submit(submit_id)
         except self.data_master.DataMasterError as e:
-            self.logger.error("Set submit '%s' not found: %s", submit_id, str(e))
+            self.logger.error("Set submit '%s' not found: %s", submit_id, str(e), exc_info=True)
             return
         try:
             await self.master.process_finished_set_submit(set_submit)
         except Exception as e:
-            self.logger.error("Error while processing set submit '%s': %s", submit_id, str(e))
+            self.logger.error("Error while processing set submit '%s': %s", submit_id, str(e), exc_info=True)
             await self.master.trash_task_submit(set_submit.task_submit, e)
             return
         try:
@@ -66,7 +66,7 @@ class PassiveHandler(Handler):
                                      task_submit.submit_id)
                     await self.master.process_finished_task_submit(task_submit)
         except Exception as e:
-            self.logger.error("Error while finishing task submit '%s': %s", submit_id, str(e))
+            self.logger.error("Error while finishing task submit '%s': %s", submit_id, str(e), exc_info=True)
             await self.master.trash_task_submit(set_submit.task_submit, e)
             return
 

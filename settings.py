@@ -48,7 +48,7 @@ JUDGES = {
 }
 
 # Kolejka settings
-KOLEJKA_CALLBACK_URL_PREFIX = f'http://{SERVER_URL}:{SERVER_PORT}/kolejka'
+KOLEJKA_CALLBACK_URL_PREFIX = f'https://{SERVER_URL}/kolejka'
 BUILD_NAMESPACE = 'kolejka'
 
 # Timeout settings
