@@ -121,7 +121,8 @@ class TaskSubmitInterface(ABC):
     class TaskState(Enum):
         INITIAL = 0
         AWAITING_SETS = 1
-        DONE = 2
+        SENDING_TO_BACA2 = 2
+        DONE = 3
         ERROR = -1
 
     def __init__(self,

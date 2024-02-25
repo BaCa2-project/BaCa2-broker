@@ -153,7 +153,7 @@ class MasterTest(unittest.TestCase):
                 await asyncio.sleep(0.01)
 
             async def send(self, task_submit: TaskSubmitInterface):
-                self.ut.assertTrue(task_submit.state == TaskSubmit.TaskState.DONE)
+                self.ut.assertTrue(task_submit.state == TaskSubmit.TaskState.SENDING_TO_BACA2)
                 for set_submit in task_submit.set_submits:
                     self.ut.assertTrue(set_submit.state == SetSubmit.SetState.DONE)
                     self.ut.assertEqual(set_submit.get_status_code(), '200')
