@@ -75,6 +75,13 @@ class BrokerMaster:
                          task_submit.submit_id, task_submit.mod_date - task_submit.creation_date)
         self.data_master.delete_task_submit(task_submit)
 
+    async def if_all_checked_process_finished_task_submit(self, task_submit: TaskSubmitInterface):
+        async with task_submit.lock:
+            if task_submit.all_checked() and task_submit.state == task_submit.TaskState.AWAITING_SETS:
+                self.logger.info("All sets checked for task submit '%s', now sending to BaCa2",
+                                 task_submit.submit_id)
+                await self.process_finished_task_submit(task_submit)
+
     async def process_package(self, package: Package):
         """Builds package if needed."""
         if not await self.package_manager.check_build(package) or self.package_manager.force_rebuild:
