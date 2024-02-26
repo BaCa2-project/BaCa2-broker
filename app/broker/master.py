@@ -53,6 +53,7 @@ class BrokerMaster:
             if not all(s.submit_id in self.data_master.set_submits for s in task_submit.set_submits):
                 self.logger.critical("Task submit '%s' has set submits that are not in database",
                                      task_submit.submit_id)
+                return
             task_submit.change_state(task_submit.TaskState.ERROR, requires=None)
             task_submit.change_set_states(SetSubmitInterface.SetState.ERROR, requires=None)
             self.data_master.delete_task_submit(task_submit)
@@ -82,6 +83,7 @@ class BrokerMaster:
         self.data_master.delete_task_submit(task_submit)
 
     async def if_all_checked_process_finished_task_submit(self, task_submit: TaskSubmitInterface):
+        """Checks if all sets are checked and if so, calls process_finished_task_submit."""
         async with task_submit.lock:
             if task_submit.all_checked() and task_submit.state == task_submit.TaskState.AWAITING_SETS:
                 self.logger.info("All sets checked for task submit '%s', now sending to BaCa2",
@@ -117,4 +119,5 @@ class BrokerMaster:
             await asyncio.sleep(interval)
 
     async def start_daemons(self, task_submit_timeout: timedelta, interval: int):
+        """Launch this method as a separate task to start daemons."""
         await asyncio.gather(self.deletion_daemon(task_submit_timeout, interval))
