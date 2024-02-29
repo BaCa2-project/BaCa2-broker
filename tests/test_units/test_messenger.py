@@ -34,8 +34,8 @@ async def failure():
 class MockTaskSubmit(TaskSubmitInterface):
 
     @property
-    def results(self) -> list[BrokerToBaca]:
-        return []
+    def results(self) -> dict[str, BrokerToBaca]:
+        return {}
 
     @property
     def set_submits(self) -> list[SetSubmitInterface]:

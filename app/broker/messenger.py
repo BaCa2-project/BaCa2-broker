@@ -276,7 +276,7 @@ class BacaMessenger(BacaMessengerInterface):
         )
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(url=baca_url, json=message.serialize()) as response:
+            async with session.post(url=baca_url, json=message.json()) as response:
                 status_code = response.status
 
         if status_code != 200:
@@ -295,7 +295,7 @@ class BacaMessenger(BacaMessengerInterface):
             error=error_msg
         )
         async with aiohttp.ClientSession() as session:
-            async with session.post(url=baca_url, json=message.serialize()) as response:
+            async with session.post(url=baca_url, json=message.json()) as response:
                 status_code = response.status
 
         return status_code == 200

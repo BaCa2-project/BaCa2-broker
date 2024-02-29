@@ -29,7 +29,7 @@ class MasterTest(unittest.TestCase):
             await asyncio.sleep(0.01)
             if self.raise_exception:
                 raise Exception
-            return SetResult(name='x', tests=[])
+            return SetResult(name='x', tests={})
 
         async def send(self, set_submit: SetSubmitInterface):
             await asyncio.sleep(0.01)
@@ -88,9 +88,9 @@ class MasterTest(unittest.TestCase):
     def test_baca_send(self):
         btb = BacaToBroker(pass_hash='x',
                            submit_id='submit1',
-                           package_path=self.package_path,
+                           package_path=str(self.package_path),
                            commit_id='1',
-                           submit_path=self.submit_path)
+                           submit_path=str(self.submit_path))
         asyncio.run(self.handlers.handle_baca(btb))
         self.assertTrue('submit1' in self.data_master.task_submits)
         self.assertEqual(len(self.data_master.set_submits), 3)
@@ -99,9 +99,9 @@ class MasterTest(unittest.TestCase):
     def test_kolejka_receive(self):
         btb = BacaToBroker(pass_hash='x',
                            submit_id='submit1',
-                           package_path=self.package_path,
+                           package_path=str(self.package_path),
                            commit_id='1',
-                           submit_path=self.submit_path)
+                           submit_path=str(self.submit_path))
         asyncio.run(self.handlers.handle_baca(btb))
         task_submit = self.data_master.task_submits['submit1']
         self.assertEqual(task_submit.state, TaskSubmit.TaskState.AWAITING_SETS)
@@ -123,9 +123,9 @@ class MasterTest(unittest.TestCase):
     def test_trash_submit(self):
         btb = BacaToBroker(pass_hash='x',
                            submit_id='submit1',
-                           package_path=self.package_path,
+                           package_path=str(self.package_path),
                            commit_id='1',
-                           submit_path=self.submit_path)
+                           submit_path=str(self.submit_path))
         asyncio.run(self.handlers.handle_baca(btb))
         task_submit = self.data_master.task_submits['submit1']
         self.assertEqual(task_submit.state, TaskSubmit.TaskState.AWAITING_SETS)
@@ -173,7 +173,7 @@ class MasterTest(unittest.TestCase):
                 await asyncio.sleep(0.01)
                 if self.raise_exception:
                     raise Exception
-                return SetResult(name='x', tests=[])
+                return SetResult(name='x', tests={})
 
             async def send(self, set_submit: SetSubmitInterface):
                 await asyncio.sleep(0.01)
@@ -196,9 +196,9 @@ class MasterTest(unittest.TestCase):
         kolejka_messenger.handlers = handlers
         btb_list = [BacaToBroker(pass_hash='x',
                                  submit_id=f'submit{i}',
-                                 package_path=self.package_path,
+                                 package_path=str(self.package_path),
                                  commit_id='1',
-                                 submit_path=self.submit_path) for i in range(100)]
+                                 submit_path=str(self.submit_path)) for i in range(100)]
 
         async def run():
             await asyncio.gather(*[handlers.handle_baca(btb) for btb in btb_list], return_exceptions=True)
@@ -254,7 +254,7 @@ class ActiveHandlerTest(unittest.TestCase):
             if self.raise_exception:
                 raise Exception
             self.processed.append(set_submit)
-            set_submit.set_result(SetResult(name='x', tests=[]))
+            set_submit.set_result(SetResult(name='x', tests={}))
 
     def setUp(self):
         self.package_path = self.resource_dir / '1'
@@ -284,9 +284,9 @@ class ActiveHandlerTest(unittest.TestCase):
     def test_handler(self):
         btb = BacaToBroker(pass_hash='x',
                            submit_id='submit1',
-                           package_path=self.package_path,
+                           package_path=str(self.package_path),
                            commit_id='1',
-                           submit_path=self.submit_path)
+                           submit_path=str(self.submit_path))
         asyncio.run(self.handlers.handle_baca(btb))
         set_submit = self.kolejka_messenger.processed[0]
         self.assertIsNotNone(set_submit.get_result())
@@ -310,9 +310,9 @@ class ActiveHandlerTest(unittest.TestCase):
     def test_handler_error(self):
         btb = BacaToBroker(pass_hash='x',
                            submit_id='submit1',
-                           package_path=self.package_path,
+                           package_path=str(self.package_path),
                            commit_id='1',
-                           submit_path=self.submit_path)
+                           submit_path=str(self.submit_path))
         self.kolejka_messenger.raise_exception = True
         asyncio.run(self.handlers.handle_baca(btb))
         self.assertTrue(len(self.kolejka_messenger.processed) == 0)
