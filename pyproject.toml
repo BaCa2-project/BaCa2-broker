@@ -1,16 +1,26 @@
 [tool.poetry]
 name = "baca2-broker"
 version = "0.1.0"
-description = ""
-authors = ["Bartosz Deptuła <barti.deptula@gmail.com>"]
+description = "Broker for BaCa2 project"
+authors = [
+    "Bartosz Deptuła <barti.deptula@gmail.com>",
+    "Mateusz Kadula <mateusz.kadula@student.uj.edu.pl>"
+]
 readme = "README.md"
-packages = [{include = "broker"}]
+packages = [{include = "app"}]
 
 [tool.poetry.dependencies]
-python = "^3.10"
-pyyaml = "^6.0"
-baca2-package-manager = "^0.2"
-
+python = "^3.11"
+pyyaml = "^6.0.1"
+baca2-package-manager = "^0.3.7"
+requests = "^2.31.0"
+fastapi = "^0.110.0"
+python-dotenv = "^1.0.0"
+coverage = "^7.3.2"
+parameterized = "^0.9.0"
+aiohttp = "^3.9.3"
+uvicorn = "^0.27.0"
+httpx = "^0.27.0"
 
 [build-system]
 requires = ["poetry-core"]
