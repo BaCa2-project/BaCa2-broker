@@ -58,7 +58,7 @@ class BrokerMaster:
             task_submit.change_set_states(SetSubmitInterface.SetState.ERROR, requires=None)
             self.data_master.delete_task_submit(task_submit)
             if error is not None:
-                await self.baca_messenger.send_error(task_submit, str(error))
+                await self.baca_messenger.send_error(task_submit, error)
 
     async def process_finished_set_submit(self, set_submit: SetSubmitInterface):
         """Gets results from kolejka and changes state of set submit to DONE."""

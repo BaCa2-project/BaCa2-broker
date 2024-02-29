@@ -10,6 +10,7 @@ import asyncio
 from datetime import datetime
 from pathlib import Path
 import logging
+import traceback
 
 import requests
 import yaml
@@ -263,7 +264,7 @@ class BacaMessenger(BacaMessengerInterface):
 
     async def send_error(self, task_submit: TaskSubmitInterface, error: Exception) -> bool:
         try:
-            return await self._send_error_to_baca(task_submit, str(error), self.baca_failure_url, self.password)
+            return await self._send_error_to_baca(task_submit, error, self.baca_failure_url, self.password)
         except aiohttp.ClientError:
             return False
 
@@ -276,7 +277,7 @@ class BacaMessenger(BacaMessengerInterface):
         )
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(url=baca_url, json=message.json()) as response:
+            async with session.post(url=baca_url, json=message.model_dump_json()) as response:
                 status_code = response.status
 
         if status_code != 200:
@@ -286,16 +287,19 @@ class BacaMessenger(BacaMessengerInterface):
 
     @staticmethod
     async def _send_error_to_baca(task_submit: TaskSubmitInterface,
-                                  error_msg: str,
+                                  error: Exception,
                                   baca_url: str,
                                   password: str) -> bool:
         message = BrokerToBacaError(
             pass_hash=make_hash(password, task_submit.submit_id),
             submit_id=task_submit.submit_id,
-            error=error_msg
+            error_data={
+                'message': str(error),
+                'traceback': ''.join(traceback.format_exception(type(error), error, error.__traceback__))
+            }
         )
         async with aiohttp.ClientSession() as session:
-            async with session.post(url=baca_url, json=message.json()) as response:
+            async with session.post(url=baca_url, json=message.model_dump_json()) as response:
                 status_code = response.status
 
         return status_code == 200

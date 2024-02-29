@@ -98,7 +98,7 @@ class BacaMessengerTest(unittest.TestCase):
         task_submit = MockTaskSubmit(master=None, task_submit_id="submit_id", package_path=None,
                                      commit_id="commit_id",
                                      submit_path=None)
-        out = asyncio.run(self.baca_messenger.send_error(task_submit, "error"))
+        out = asyncio.run(self.baca_messenger.send_error(task_submit, Exception('test')))
         self.assertTrue(out)
 
 
