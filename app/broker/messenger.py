@@ -160,12 +160,20 @@ class KolejkaMessenger(KolejkaMessengerInterface):
         tests = {}
         for key, val in content.items():
             satori = val['satori']
+
+            logs = {}
+            logs_names = ['compile_log', 'checker_log']
+            for log_name in logs_names:
+                logs[log_name] = satori.get('log_name', '')
+
             tmp = TestResult(
                 name=key,
                 status=satori['status'],
-                time_real=float(satori['execute_time_real'][:-1]),
-                time_cpu=float(satori['execute_time_cpu'][:-1]),
-                runtime_memory=int(satori['execute_memory'][:-1])
+                time_real=float(satori.get('execute_time_real', 'NaN ')[:-1]),
+                time_cpu=float(satori.get('execute_time_cpu', 'NaN ')[:-1]),
+                runtime_memory=int(satori.get('execute_memory', '-1 ')[:-1]),
+                answer=satori.get('answer', ''),
+                logs=logs,
             )
             tests[key] = tmp
         return SetResult(name=set_submit.set_name, tests=tests)

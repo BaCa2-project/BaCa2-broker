@@ -73,6 +73,7 @@ class Builder:
                     'tool_log': 'str:/io/generator/**/stderr,/io/verifier/**/stdout,'
                                 '/io/verifier/**/stderr,/io/hinter/**/stderr',
                     'checker_log': 'str:/io/checker/**/stdout,/io/checker/**/stderr',
+                    'answer': 'str:/io/executor/run/stdout',
                     'logs': '/logs/logs',
                     'debug': '/debug/debug',
                 }
