@@ -1,8 +1,8 @@
 import asyncio
 from contextlib import asynccontextmanager
 
+import pydantic
 from fastapi import FastAPI, BackgroundTasks, HTTPException
-from pydantic import BaseModel
 from baca2PackageManager.broker_communication import BacaToBroker, make_hash
 import settings
 
@@ -92,28 +92,27 @@ app = FastAPI(title='BaCa2-broker', lifespan=lifespan)
 
 # VIEWS =================================================================================
 
-class Content(BaseModel):
-    """Content of baCa2 submit request"""
-    submit_id: str
-    pass_hash: str
-    package_path: str
-    commit_id: str
-    submit_path: str
-
-
 @app.get("/")
 async def root():
     return {"message": "Broker is running"}
 
 
+class Content(pydantic.BaseModel):
+    pass_hash: str
+    submit_id: str
+    package_path: str
+    commit_id: str
+    submit_path: str
+
+
 @app.post("/baca")
 async def baca_post(content: Content, background_tasks: BackgroundTasks):
     """Handle submit request from baCa2"""
-    btb = BacaToBroker(content.pass_hash,
-                       content.submit_id,
-                       content.package_path,
-                       content.commit_id,
-                       content.submit_path)
+    btb = BacaToBroker(pass_hash=content.pass_hash,
+                       submit_id=content.submit_id,
+                       package_path=content.package_path,
+                       commit_id=content.commit_id,
+                       submit_path=content.submit_path)
 
     if make_hash(settings.BROKER_PASSWORD, btb.submit_id) != btb.pass_hash:
         raise HTTPException(status_code=401, detail="Wrong Password")

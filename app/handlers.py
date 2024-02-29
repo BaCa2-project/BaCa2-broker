@@ -59,12 +59,7 @@ class PassiveHandler(Handler):
             await self.master.trash_task_submit(set_submit.task_submit, e)
             return
         try:
-            task_submit = set_submit.task_submit
-            async with task_submit.lock:
-                if task_submit.all_checked() and task_submit.state == task_submit.TaskState.AWAITING_SETS:
-                    self.logger.info("All sets checked for task submit '%s', now sending to BaCa2",
-                                     task_submit.submit_id)
-                    await self.master.process_finished_task_submit(task_submit)
+            await self.master.if_all_checked_process_finished_task_submit(set_submit.task_submit)
         except Exception as e:
             self.logger.error("Error while finishing task submit '%s': %s", submit_id, str(e), exc_info=True)
             await self.master.trash_task_submit(set_submit.task_submit, e)

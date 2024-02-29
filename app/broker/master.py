@@ -43,15 +43,22 @@ class BrokerMaster:
     async def trash_task_submit(self, task_submit: TaskSubmitInterface, error: Exception | None):
         """
         Changes state of task submit to ERROR, sends error message to BaCa2 if error != None
-         and deletes task submit from database.
+        and deletes task submit from database.
         """
         self.logger.info("Trashing task submit '%s'", task_submit.submit_id)
         async with task_submit.lock:
+            if task_submit.submit_id not in self.data_master.task_submits:
+                self.logger.warning("Task submit '%s' already deleted", task_submit.submit_id)
+                return
+            if not all(s.submit_id in self.data_master.set_submits for s in task_submit.set_submits):
+                self.logger.critical("Task submit '%s' has set submits that are not in database",
+                                     task_submit.submit_id)
+                return
             task_submit.change_state(task_submit.TaskState.ERROR, requires=None)
             task_submit.change_set_states(SetSubmitInterface.SetState.ERROR, requires=None)
             self.data_master.delete_task_submit(task_submit)
             if error is not None:
-                await self.baca_messenger.send_error(task_submit, str(error))
+                await self.baca_messenger.send_error(task_submit, error)
 
     async def process_finished_set_submit(self, set_submit: SetSubmitInterface):
         """Gets results from kolejka and changes state of set submit to DONE."""
@@ -68,12 +75,20 @@ class BrokerMaster:
         """Sends task submit to BaCa2 and deletes it from database. All set submits must be checked before calling."""
         if not task_submit.all_checked():
             raise ValueError("Not all sets checked")
-        task_submit.change_state(task_submit.TaskState.DONE,
-                                 requires=task_submit.TaskState.AWAITING_SETS)
+        task_submit.change_state(task_submit.TaskState.SENDING_TO_BACA2, requires=task_submit.TaskState.AWAITING_SETS)
         await self.baca_messenger.send(task_submit)
         self.logger.info("Task submit '%s' finished in %s",
                          task_submit.submit_id, task_submit.mod_date - task_submit.creation_date)
+        task_submit.change_state(task_submit.TaskState.DONE, requires=task_submit.TaskState.SENDING_TO_BACA2)
         self.data_master.delete_task_submit(task_submit)
+
+    async def if_all_checked_process_finished_task_submit(self, task_submit: TaskSubmitInterface):
+        """Checks if all sets are checked and if so, calls process_finished_task_submit."""
+        async with task_submit.lock:
+            if task_submit.all_checked() and task_submit.state == task_submit.TaskState.AWAITING_SETS:
+                self.logger.info("All sets checked for task submit '%s', now sending to BaCa2",
+                                 task_submit.submit_id)
+                await self.process_finished_task_submit(task_submit)
 
     async def process_package(self, package: Package):
         """Builds package if needed."""
@@ -104,4 +119,5 @@ class BrokerMaster:
             await asyncio.sleep(interval)
 
     async def start_daemons(self, task_submit_timeout: timedelta, interval: int):
+        """Launch this method as a separate task to start daemons."""
         await asyncio.gather(self.deletion_daemon(task_submit_timeout, interval))

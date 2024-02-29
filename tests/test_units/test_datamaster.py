@@ -1,7 +1,6 @@
 import asyncio
 import os
 import unittest
-from datetime import timedelta
 from pathlib import Path
 
 from baca2PackageManager import Package
@@ -166,7 +165,7 @@ class SubmitsTest(unittest.TestCase):
     def test_set_results(self):
         asyncio.run(self.task_submit.initialise())
         set_submit = self.task_submit.set_submits[0]
-        result = BrokerToBaca("submit_id", "hash", "package_path")
+        result = BrokerToBaca(submit_id="submit_id", pass_hash="hash", results={})
         self.assertRaises(ValueError, set_submit.get_result)
         set_submit.set_result(result)
         self.assertEqual(set_submit.get_result(), result)
@@ -181,7 +180,7 @@ class SubmitsTest(unittest.TestCase):
     def test_get_results(self):
         asyncio.run(self.task_submit.initialise())
         self.assertRaises(ValueError, lambda: self.task_submit.results)
-        result = BrokerToBaca("submit_id", "hash", "package_path")
+        result = BrokerToBaca(submit_id="submit_id", pass_hash="hash", results={})
         for set_submit in self.task_submit.set_submits:
             set_submit.change_state(SetSubmit.SetState.DONE, requires=None)
             set_submit.set_result(result)
