@@ -16,12 +16,16 @@ import requests
 import yaml
 import aiohttp
 from baca2PackageManager import Package
-from baca2PackageManager.broker_communication import BrokerToBaca, make_hash, BrokerToBacaError, SetResult, TestResult
+from baca2PackageManager.broker_communication import BrokerToBaca, make_hash, BrokerToBacaError, \
+    SetResult, TestResult
 
 from .builder import Builder
 from .datamaster import TaskSubmitInterface, SetSubmitInterface
 from .yaml_tags import get_loader
 
+import logging
+
+logger = logging.getLogger(__name__)
 
 class KolejkaMessengerInterface(ABC):
     """Interface for KOLEJKA communication."""
@@ -73,7 +77,8 @@ class KolejkaMessenger(KolejkaMessengerInterface):
         try:
             start = datetime.now()
             await self._send_inner(set_submit)
-            self.logger.debug("Sending submit '%s' lasted %s", set_submit.submit_id, datetime.now() - start)
+            self.logger.debug("Sending submit '%s' lasted %s", set_submit.submit_id,
+                              datetime.now() - start)
         except Exception as e:
             raise self.KolejkaCommunicationError("Cannot communicate with KOLEJKA.") from e
 
@@ -90,7 +95,8 @@ class KolejkaMessenger(KolejkaMessengerInterface):
                      '--callback', callback_url,
                      '--library-path', self.get_kolejka_judge(task_submit.package),
                      self.get_judge_py(task_submit.package),
-                     task_submit.package.build_path(self.build_namespace) / set_submit.set_name / "tests.yaml",
+                     task_submit.package.build_path(
+                         self.build_namespace) / set_submit.set_name / "tests.yaml",
                      task_submit.submit_path,
                      task_dir]
 
@@ -99,7 +105,8 @@ class KolejkaMessenger(KolejkaMessengerInterface):
         _, stderr = await judge_future.communicate()
 
         if judge_future.returncode != 0:
-            raise self.KolejkaCommunicationError(f'KOLEJKA judge failed to create task; stderr:\n{stderr.decode()}')
+            raise self.KolejkaCommunicationError(
+                f'KOLEJKA judge failed to create task; stderr:\n{stderr.decode()}')
 
         cmd_client = [self.python_call,
                       self.get_kolejka_client(task_submit.package),
@@ -114,8 +121,9 @@ class KolejkaMessenger(KolejkaMessengerInterface):
         result_code = stdout.decode('utf-8').strip()
 
         if client_future.returncode != 0:
-            raise self.KolejkaCommunicationError(f'KOLEJKA client failed to communicate with KOLEJKA server. '
-                                                 f'stderr:\n{stderr.decode()}')
+            raise self.KolejkaCommunicationError(
+                f'KOLEJKA client failed to communicate with KOLEJKA server. '
+                f'stderr:\n{stderr.decode()}')
 
         set_submit.set_status_code(result_code)
 
@@ -130,7 +138,8 @@ class KolejkaMessenger(KolejkaMessengerInterface):
             self.logger.error(str(e))
             raise self.KolejkaCommunicationError("Cannot communicate with KOLEJKA.") from e
 
-    async def _get_results_inner(self, set_submit: SetSubmitInterface, result_code: str) -> SetResult:
+    async def _get_results_inner(self, set_submit: SetSubmitInterface,
+                                 result_code: str) -> SetResult:
         result_dir = self.submits_dir / set_submit.task_submit.submit_id / f'{set_submit.set_name}.result'
 
         result_get = [self.python_call,
@@ -148,7 +157,8 @@ class KolejkaMessenger(KolejkaMessengerInterface):
         _, stderr = await result_future.communicate()
 
         if result_future.returncode != 0:
-            raise self.KolejkaCommunicationError(f'KOLEJKA client failed to get results; stderr:\n{stderr.decode()}')
+            raise self.KolejkaCommunicationError(
+                f'KOLEJKA client failed to get results; stderr:\n{stderr.decode()}')
 
         return self._parse_results(set_submit, result_dir)
 
@@ -164,13 +174,13 @@ class KolejkaMessenger(KolejkaMessengerInterface):
             logs = {}
             logs_names = ['compile_log', 'checker_log']
             for log_name in logs_names:
-                logs[log_name] = satori.get('log_name', '')
+                logs[log_name] = satori.get(log_name, '')
 
             tmp = TestResult(
                 name=key,
-                status=satori['status'],
-                time_real=float(satori.get('execute_time_real', 'NaN ')[:-1]),
-                time_cpu=float(satori.get('execute_time_cpu', 'NaN ')[:-1]),
+                status=satori.get('status'),
+                time_real=float(satori.get('execute_time_real', '-1.0 ')[:-1]),
+                time_cpu=float(satori.get('execute_time_cpu', '-1.0 ')[:-1]),
                 runtime_memory=int(satori.get('execute_memory', '-1 ')[:-1]),
                 answer=satori.get('answer', ''),
                 logs=logs,
@@ -195,7 +205,8 @@ class KolejkaMessengerActiveWait(KolejkaMessenger):
                      '--callback', callback_url,
                      '--library-path', self.get_kolejka_judge(task_submit.package),
                      self.get_judge_py(task_submit.package),
-                     task_submit.package.build_path(self.build_namespace) / set_submit.set_name / "tests.yaml",
+                     task_submit.package.build_path(
+                         self.build_namespace) / set_submit.set_name / "tests.yaml",
                      task_submit.submit_path,
                      task_dir]
 
@@ -204,7 +215,8 @@ class KolejkaMessengerActiveWait(KolejkaMessenger):
         _, stderr = await judge_future.communicate()
 
         if judge_future.returncode != 0:
-            raise self.KolejkaCommunicationError(f'KOLEJKA judge failed to create task; stderr:\n{stderr.decode()}')
+            raise self.KolejkaCommunicationError(
+                f'KOLEJKA judge failed to create task; stderr:\n{stderr.decode()}')
 
         set_submit.set_result(await self.results_task(set_submit))
 
@@ -233,7 +245,8 @@ class KolejkaMessengerActiveWait(KolejkaMessenger):
         _, stderr = await result_future.communicate()
 
         if result_future.returncode != 0:
-            raise self.KolejkaCommunicationError(f'KOLEJKA client failed to get results; stderr:\n{stderr.decode()}')
+            raise self.KolejkaCommunicationError(
+                f'KOLEJKA client failed to get results; stderr:\n{stderr.decode()}')
 
         results = self._parse_results(set_submit, result_dir)
         return results
@@ -258,7 +271,8 @@ class BacaMessengerInterface(ABC):
 
 class BacaMessenger(BacaMessengerInterface):
 
-    def __init__(self, baca_success_url: str, baca_failure_url: str, password: str, logger: logging.Logger):
+    def __init__(self, baca_success_url: str, baca_failure_url: str, password: str,
+                 logger: logging.Logger):
         self.baca_success_url = baca_success_url
         self.baca_failure_url = baca_failure_url
         self.password = password
@@ -272,7 +286,8 @@ class BacaMessenger(BacaMessengerInterface):
 
     async def send_error(self, task_submit: TaskSubmitInterface, error: Exception) -> bool:
         try:
-            return await self._send_error_to_baca(task_submit, error, self.baca_failure_url, self.password)
+            return await self._send_error_to_baca(task_submit, error, self.baca_failure_url,
+                                                  self.password)
         except aiohttp.ClientError:
             return False
 
@@ -284,8 +299,12 @@ class BacaMessenger(BacaMessengerInterface):
             results=deepcopy(task_submit.results),
         )
 
+        logger.warning(f'Sending results to baCa2: {message.model_dump_json()}')
         async with aiohttp.ClientSession() as session:
-            async with session.post(url=baca_url, json=message.model_dump_json()) as response:
+            async with session.post(url=baca_url,
+                                    verify_ssl=False,
+                                    headers={'content-type': 'application/json'},
+                                    data=message.model_dump_json()) as response:
                 status_code = response.status
 
         if status_code != 200:
@@ -303,11 +322,15 @@ class BacaMessenger(BacaMessengerInterface):
             submit_id=task_submit.submit_id,
             error_data={
                 'message': str(error),
-                'traceback': ''.join(traceback.format_exception(type(error), error, error.__traceback__))
+                'traceback': ''.join(
+                    traceback.format_exception(type(error), error, error.__traceback__))
             }
         )
         async with aiohttp.ClientSession() as session:
-            async with session.post(url=baca_url, json=message.model_dump_json()) as response:
+            async with session.post(url=baca_url,
+                                    verify_ssl=False,
+                                    headers={'content-type': 'application/json'},
+                                    data=message.model_dump_json()) as response:
                 status_code = response.status
 
         return status_code == 200

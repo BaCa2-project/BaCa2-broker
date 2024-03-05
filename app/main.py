@@ -8,10 +8,10 @@ import settings
 
 from .broker.master import BrokerMaster
 from .broker.datamaster import DataMaster, SetSubmit, TaskSubmit
-from .broker.messenger import KolejkaMessenger, BacaMessenger, PackageManager, KolejkaMessengerActiveWait
+from .broker.messenger import KolejkaMessenger, BacaMessenger, PackageManager, \
+    KolejkaMessengerActiveWait
 from .handlers import PassiveHandler, ActiveHandler
 from .logger import LoggerManager
-
 
 # APP ===================================================================================
 
@@ -72,8 +72,9 @@ daemons = set()
 @asynccontextmanager
 async def lifespan(app_: FastAPI):
     # start daemons
-    task = asyncio.create_task(master.start_daemons(task_submit_timeout=settings.TASK_SUBMIT_TIMEOUT,
-                                                    interval=settings.DELETION_DAEMON_INTERVAL))
+    task = asyncio.create_task(
+        master.start_daemons(task_submit_timeout=settings.TASK_SUBMIT_TIMEOUT,
+                             interval=settings.DELETION_DAEMON_INTERVAL))
     daemons.add(task)
 
     yield
