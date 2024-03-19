@@ -19,15 +19,17 @@ def judge(args):
     c_standard = args.test.get('c_standard', 'c11')
     cpp_standard = args.test.get('cpp_standard', 'c++17')
     gcc_arguments = [ arg.strip() for arg in args.test.get('gcc_arguments', '').split() if arg.strip() ]
+    gcc_arguments.append('-Wall')
     time_limit = parse_time(args.test.get('time', '10s'))
     memory_limit = parse_memory(args.test.get('memory', '1G'))
-    output_size_limit = parse_memory(args.test.get('output_size', '1G'))
+    output_size_limit = parse_memory(args.test.get('output_size', '64M'))
     error_size_limit  = parse_memory(args.test.get('error_size', '1M'))
     basename = args.test.get('basename', None)
+    regex_count = args.test.get('regex_count', None)
     args.add_steps(
         system=SystemPrepareTask(default_logs=False),
         source=SolutionPrepareTask(source=args.solution, basename=basename, allow_extract=True, override=args.test.get('environment', None), limit_real_time=prepare_time),
-        source_rules=SolutionSourceRulesTask(max_size=source_size_limit),
+        source_rules=SolutionSourceRulesTask(max_size=source_size_limit, regex_count=regex_count),
         builder=SolutionBuildAutoTask([
             [SolutionBuildCMakeTask, [], {}],
             [SolutionBuildMakeTask, [], {}],

@@ -15,6 +15,8 @@ class Builder:
         'test_generator': 'generator',
         'memory_limit': 'memory',
         'time_limit': 'time',
+        # 'source_verifier': 'verifier',
+        # 'source_name': 'basename',
     }
     IGNORED_KEYS = ['name', 'points', 'weight', 'tests']
 
@@ -79,7 +81,27 @@ class Builder:
                 }
             }
 
+        if self.package.get('checker'):
+            test_yaml['checker'] = File('checker' + Path(self.package['checker']).suffix)
+        if self.package.get('verifier'):
+            test_yaml['verifier'] = File('verifier' + Path(self.package['verifier']).suffix)
+        if self.package.get('hinter'):
+            test_yaml['hinter'] = File('hinter' + Path(self.package['hinter']).suffix)
+        if self.package.get('regex_count'):
+            regex_count = self.package['regex_count']
+            if isinstance(regex_count, list):
+                regex_count = ','.join(map(str, regex_count))
+            test_yaml['regex_count'] = regex_count
+
         return test_yaml
+
+    def create_path_from_config(self, test_yaml, conf_name: str):
+        if self.package.get(conf_name):
+            conf_path = self.package.commit_path / self.package[conf_name]
+            if conf_path.exists():
+                os.symlink(conf_path, self.common_path / (conf_name + conf_path.suffix))
+            else:
+                test_yaml.pop(conf_name, None)
 
     def _create_common(self,
                        test_yaml: dict,
@@ -87,11 +109,14 @@ class Builder:
         self.common_path = self.build_path / 'common'
         self.common_path.mkdir()
 
-        self.to_yaml(test_yaml, self.common_path / 'test.yaml')
-
         os.symlink(settings.KOLEJKA_SRC_DIR / 'kolejka-judge', self.common_path / 'kolejka-judge')
         os.symlink(settings.KOLEJKA_SRC_DIR / 'kolejka-client', self.common_path / 'kolejka-client')
         os.symlink(settings.JUDGES[judge_type], self.common_path / 'judge.py')
+        self.create_path_from_config(test_yaml, 'checker')
+        self.create_path_from_config(test_yaml, 'verifier')
+        self.create_path_from_config(test_yaml, 'hinter')
+
+        self.to_yaml(test_yaml, self.common_path / 'test.yaml')
 
     def build(self):
         self.build_path = self.package.prepare_build(self.build_namespace)
@@ -115,11 +140,17 @@ class SetBuilder:
         test_yaml = {
             INCLUDE_TAG: '../common/test.yaml',
         }
+        if self.t_set.get('environment') is not None:
+            env = self.t_set['environment']
+            os.symlink(env, self.build_path / env)
+            test_yaml['environment'] = File(env)
+
         for k, v in self.t_set:
             key = Builder.TRANSLATE_CMD.get(k, k)
             if key == 'time':
                 v = f'{v * 1000}ms'
-            if key not in Builder.IGNORED_KEYS and v is not None:
+            if key not in Builder.IGNORED_KEYS + ['checker', 'verifier',
+                                                  'hinter', 'environment'] and v is not None:
                 test_yaml[key] = v
         return test_yaml
 
@@ -141,7 +172,8 @@ class SetBuilder:
             key = Builder.TRANSLATE_CMD.get(k, k)
             if key == 'time':
                 v = f'{v * 1000}ms'
-            if key not in Builder.IGNORED_KEYS[:] + ['input', 'output', 'hint']:
+            if key not in Builder.IGNORED_KEYS[:] + ['input', 'output', 'hint', 'checker',
+                                                     'verifier', 'hinter']:
                 single_test[key] = v
 
         test_yaml[test['name']] = single_test
