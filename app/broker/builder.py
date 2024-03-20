@@ -141,8 +141,8 @@ class SetBuilder:
             INCLUDE_TAG: '../common/test.yaml',
         }
         if self.t_set.get('environment') is not None:
-            env = self.t_set['environment']
-            os.symlink(env, self.build_path / env)
+            env = self.t_set._path / self.t_set['environment']
+            os.symlink(env, self.build_path / env.name)
             test_yaml['environment'] = File(env)
 
         for k, v in self.t_set:
