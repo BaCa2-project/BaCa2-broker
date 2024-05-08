@@ -8,30 +8,30 @@ from baca2PackageManager import set_base_dir, add_supported_extensions
 
 load_dotenv()
 
+
+class ConfigError(Exception):
+    pass
+
+
 # Server settings
 SERVER_HOST: str = os.getenv('SERVER_HOST')
 SERVER_PORT: int = int(os.getenv('SERVER_PORT'))
 SERVER_URL: str = os.getenv('SERVER_URL')
 
-ACTIVE_WAIT: bool = os.getenv('ACTIVE_WAIT') == 'true'
+ACTIVE_WAIT: bool = os.getenv('ACTIVE_WAIT', False) == 'true'
 
 # Path settings
 BASE_DIR = Path(__file__).resolve().parent
-_baca2_dir_in = os.getenv('BACA2_DIR')
-if _baca2_dir_in is not None:
-    BACA2_DIR = Path(_baca2_dir_in)
-else:
-    BACA2_DIR = BASE_DIR.parent.parent / 'BaCa2'  # Change if you have a different path
 
 _packages_dir_in = os.getenv('PACKAGES_DIR')
-if _packages_dir_in is not None:
-    PACKAGES_DIR = Path(_packages_dir_in)
+if _packages_dir_in:
+    PACKAGES_DIR = Path(_packages_dir_in).resolve()
 else:
-    PACKAGES_DIR = BACA2_DIR / 'packages_source'
-_submits_dir_in = os.getenv('SUBMITS_DIR')
+    raise ConfigError('PACKAGES_DIR not set. Please set packages directory in .env file.')
 
-if _submits_dir_in is not None:
-    SUBMITS_DIR = Path(_submits_dir_in)
+_submits_dir_in = os.getenv('SUBMITS_DIR')
+if _submits_dir_in:
+    SUBMITS_DIR = Path(_submits_dir_in).resolve()
 else:
     SUBMITS_DIR = BASE_DIR / 'submits'
 
@@ -60,6 +60,8 @@ FORCE_REBUILD_PACKAGE = False
 
 # BaCa2 URL settings
 BACA_URL = os.getenv('BACA_URL')
+if not BACA_URL:
+    raise ConfigError('BACA_URL not set. Please set BaCa2 URL in .env file.')
 # Where results should be sent back to BaCa2
 BACA_RESULTS_URL = f'{BACA_URL}/result'
 # Where error notifications should be sent to BaCa2
@@ -71,7 +73,11 @@ BACA_PASSWORD = os.getenv('BACA_PASSWORD')
 BROKER_PASSWORD = os.getenv('BROKER_PASSWORD')
 
 # Logging settings
-LOG_DIR = BASE_DIR / 'logs'
+_log_dir_in = os.getenv('LOG_DIR')
+if _log_dir_in:
+    LOG_DIR = Path(_log_dir_in).resolve()
+else:
+    LOG_DIR = BASE_DIR / 'logs'
 LOG_DIR.mkdir(exist_ok=True)
 LOG_FILE = LOG_DIR / 'broker.log'
 LOGGER_PROMPT = '%(asctime)s %(name)s:%(filename)s:%(lineno)d: %(message)s'
