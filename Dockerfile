@@ -49,6 +49,7 @@ COPY ./settings.py /code/settings.py
 COPY ./judges /code/judges
 COPY ./app /code/app
 
+RUN mkdir -p /usr/share/baca2_share/packages
 
 EXPOSE 8080
 CMD ["poetry", "run", "python3", "./run.py"]

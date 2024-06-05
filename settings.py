@@ -55,8 +55,15 @@ BUILD_NAMESPACE = 'kolejka'
 TASK_SUBMIT_TIMEOUT: timedelta = timedelta(minutes=10)
 DELETION_DAEMON_INTERVAL: timedelta = timedelta(minutes=5)
 
-# Kolejka refresh
-KOLEJKA_REFRESH_INTERVAL: timedelta = timedelta(minutes=1)
+# Kolejka
+KOLEJKA_REFRESH_INTERVAL: timedelta = timedelta(hours=3)
+KOLEJKA_SERVER = os.getenv('KOLEJKA_SERVER')
+KOLEJKA_USERNAME = os.getenv('KOLEJKA_USERNAME')
+KOLEJKA_PASSWORD = os.getenv('KOLEJKA_PASSWORD')
+
+if not KOLEJKA_SERVER or not KOLEJKA_USERNAME or not KOLEJKA_PASSWORD:
+    raise ConfigError('KOLEJKA_SERVER, KOLEJKA_USERNAME or KOLEJKA_PASSWORD not set. '
+                      'Please set Kolejka server, username and password in .env file.')
 
 # Package settings
 FORCE_REBUILD_PACKAGE = False
