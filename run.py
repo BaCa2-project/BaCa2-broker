@@ -24,5 +24,5 @@ def create_kolejka_conf(overwrite: bool = False):
 
 if __name__ == "__main__":
     import uvicorn
-    create_kolejka_conf()
+    create_kolejka_conf(overwrite=True)
     uvicorn.run(app, host=settings.SERVER_HOST, port=settings.SERVER_PORT)
