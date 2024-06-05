@@ -73,8 +73,12 @@ daemons = set()
 async def lifespan(app_: FastAPI):
     # start daemons
     task = asyncio.create_task(
-        master.start_daemons(task_submit_timeout=settings.TASK_SUBMIT_TIMEOUT,
-                             interval=settings.DELETION_DAEMON_INTERVAL))
+        master.start_daemons(
+            task_submit_timeout=settings.TASK_SUBMIT_TIMEOUT,
+            interval_deletion=settings.DELETION_DAEMON_INTERVAL.total_seconds(),
+            interval_kolejka_refresh=settings.KOLEJKA_REFRESH_INTERVAL.total_seconds()
+        )
+    )
     daemons.add(task)
 
     yield

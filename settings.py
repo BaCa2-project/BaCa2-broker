@@ -55,6 +55,9 @@ BUILD_NAMESPACE = 'kolejka'
 TASK_SUBMIT_TIMEOUT: timedelta = timedelta(minutes=10)
 DELETION_DAEMON_INTERVAL: timedelta = timedelta(minutes=5)
 
+# Kolejka refresh
+KOLEJKA_REFRESH_INTERVAL: timedelta = timedelta(minutes=1)
+
 # Package settings
 FORCE_REBUILD_PACKAGE = False
 

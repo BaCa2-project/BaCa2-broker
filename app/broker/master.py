@@ -36,7 +36,8 @@ class BrokerMaster:
                                         requires=set_submit.SetState.SENDING_TO_KOLEJKA)
 
         async with task_submit.lock:
-            task_submit.change_state(task_submit.TaskState.AWAITING_SETS, requires=task_submit.TaskState.INITIAL)
+            task_submit.change_state(task_submit.TaskState.AWAITING_SETS,
+                                     requires=task_submit.TaskState.INITIAL)
             tasks = [kolejka_send_task(s) for s in task_submit.set_submits]
             await asyncio.gather(*tasks)
 
@@ -50,7 +51,8 @@ class BrokerMaster:
             if task_submit.submit_id not in self.data_master.task_submits:
                 self.logger.warning("Task submit '%s' already deleted", task_submit.submit_id)
                 return
-            if not all(s.submit_id in self.data_master.set_submits for s in task_submit.set_submits):
+            if not all(
+                    s.submit_id in self.data_master.set_submits for s in task_submit.set_submits):
                 self.logger.critical("Task submit '%s' has set submits that are not in database",
                                      task_submit.submit_id)
                 return
@@ -75,11 +77,13 @@ class BrokerMaster:
         """Sends task submit to BaCa2 and deletes it from database. All set submits must be checked before calling."""
         if not task_submit.all_checked():
             raise ValueError("Not all sets checked")
-        task_submit.change_state(task_submit.TaskState.SENDING_TO_BACA2, requires=task_submit.TaskState.AWAITING_SETS)
+        task_submit.change_state(task_submit.TaskState.SENDING_TO_BACA2,
+                                 requires=task_submit.TaskState.AWAITING_SETS)
         await self.baca_messenger.send(task_submit)
         self.logger.info("Task submit '%s' finished in %s",
                          task_submit.submit_id, task_submit.mod_date - task_submit.creation_date)
-        task_submit.change_state(task_submit.TaskState.DONE, requires=task_submit.TaskState.SENDING_TO_BACA2)
+        task_submit.change_state(task_submit.TaskState.DONE,
+                                 requires=task_submit.TaskState.SENDING_TO_BACA2)
         self.data_master.delete_task_submit(task_submit)
 
     async def if_all_checked_process_finished_task_submit(self, task_submit: TaskSubmitInterface):
@@ -92,7 +96,8 @@ class BrokerMaster:
 
     async def process_package(self, package: Package):
         """Builds package if needed."""
-        if not await self.package_manager.check_build(package) or self.package_manager.force_rebuild:
+        if not await self.package_manager.check_build(
+                package) or self.package_manager.force_rebuild:
             self.logger.info("Building package '%s'", package.name)
             await self.package_manager.build_package(package)
             self.logger.info("Package '%s' built successfully", package.name)
@@ -113,11 +118,19 @@ class BrokerMaster:
         for task_submit in to_be_deleted:
             await self.trash_task_submit(task_submit, None)
 
-    async def deletion_daemon(self, task_submit_timeout: timedelta, interval: int):
+    async def deletion_daemon(self, task_submit_timeout: timedelta, interval: float):
         while True:
             await self._deletion_daemon_body(task_submit_timeout)
             await asyncio.sleep(interval)
 
-    async def start_daemons(self, task_submit_timeout: timedelta, interval: int):
+    async def refresh_kolejka_src_daemon(self, interval: float):
+        while True:
+            await asyncio.to_thread(self.package_manager.refresh_kolejka_src)
+            await asyncio.sleep(interval)
+
+    async def start_daemons(self, task_submit_timeout: timedelta,
+                            interval_deletion: float,
+                            interval_kolejka_refresh: float):
         """Launch this method as a separate task to start daemons."""
-        await asyncio.gather(self.deletion_daemon(task_submit_timeout, interval))
+        await asyncio.gather(self.deletion_daemon(task_submit_timeout, interval_deletion),
+                             self.refresh_kolejka_src_daemon(interval_kolejka_refresh))

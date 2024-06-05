@@ -27,6 +27,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class KolejkaMessengerInterface(ABC):
     """Interface for KOLEJKA communication."""
 
@@ -350,6 +351,10 @@ class PackageManagerInterface(ABC):
     @abstractmethod
     async def build_package(self, package: Package):
         """Builds package."""
+        pass
+
+    @abstractmethod
+    def refresh_kolejka_src(self, add_executable_attr: bool = True):
         pass
 
 
